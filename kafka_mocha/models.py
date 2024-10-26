@@ -1,11 +1,25 @@
-from dataclasses import dataclass, field, astuple, replace
+from abc import ABC
+from dataclasses import dataclass, field, astuple, replace, asdict
 from datetime import datetime
+from enum import Enum, auto
 from heapq import heappush
 from typing import Any, Optional, Callable
 
 
-def current_timestamp_ms() -> int:
-    return int(datetime.now().timestamp() * 1000)
+class CompressionType(Enum):
+    """https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html#compression-type"""
+
+    def _generate_next_value_(name, start, count, last_values):
+        return name.lower()
+
+    NONE = auto()
+    GZIP = auto()
+    SNAPPY = auto()
+    LZ4 = auto()
+    ZSTD = auto()
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 @dataclass(eq=False)
@@ -25,17 +39,14 @@ class KHeader:
 
 
 @dataclass(eq=False)
-class PMessage:
-    """Dataclass mimicking producer message"""
-
-    partition: int
+class ABCMessage(ABC):
     topic: str
+    partition: int
     key: bytes
     value: bytes
     headers: Optional[tuple[KHeader, ...] | list[KHeader]] = field(default=None, compare=False)
-    on_delivery: Callable[[Any, Any], None] = lambda *_: None
-    # timestamp: float = field(default_factory=lambda: datetime.now().timestamp(), repr=False)
-    timestamp: int = field(default=0)
+    timestamp: int = field(default=0, kw_only=True)
+    compression_type: CompressionType = field(default=CompressionType.NONE, compare=False, kw_only=True)
 
     def __post_init__(self):
         if not (isinstance(self.partition, int) and self.partition >= 0):
@@ -47,11 +58,19 @@ class PMessage:
         if self.headers:
             if not isinstance(self.headers, tuple) and not isinstance(self.headers, list):
                 raise TypeError("Record's headers must be a tuple or a list")
+        if self.__class__ == ABCMessage:
+            raise TypeError("Cannot instantiate an abstract class.")
+
+
+@dataclass(eq=False)
+class PMessage(ABCMessage):
+    """Dataclass mimicking producer message"""
+
+    on_delivery: Optional[Callable[[Any, Any], None]] = field(default=None, kw_only=True)
+    pid: Optional[int] = field(default=None, kw_only=True)
 
     @classmethod
-    def from_producer_data(
-        cls, *, headers: tuple | list, timestamp: int, **kwargs
-    ) -> "PMessage":
+    def from_producer_data(cls, *, headers: tuple | list, timestamp: int, **kwargs) -> "PMessage":
         k_headers = [KHeader.from_tuple(header) for header in headers] if headers else []
         if timestamp != 0:
             _timestamp = timestamp / 1000
@@ -59,29 +78,23 @@ class PMessage:
         return cls(headers=k_headers, **kwargs)
 
 
-@dataclass(frozen=True, eq=False)
-class KRecord:
+@dataclass(eq=False)
+class KRecord(ABCMessage):
     """Dataclass mimicking Kafka record"""
 
-    partition: int
-    offset: int
-    key: bytes
-    value: bytes
-    headers: Optional[tuple[KHeader, ...] | list[KHeader]] = field(default=None, compare=False)
-    timestamp: float = field(default_factory=lambda: datetime.now().timestamp(), repr=False)
+    offset: int = field(default=-1, kw_only=True)
+    pid: Optional[int] = field(default=None, kw_only=True)
+
+    @classmethod
+    def from_pmessage(cls, pmessage: PMessage, offset: int) -> "KRecord":
+        pmessage_dict = asdict(pmessage)
+        del pmessage_dict["on_delivery"]
+        return cls(**pmessage_dict, offset=offset)
 
     def __post_init__(self):
-        if not (isinstance(self.partition, int) and self.partition >= 0):
-            raise TypeError("Record's partition must be unsigned integer")
-        if not (isinstance(self.offset, int) and self.partition >= 0):
+        super().__post_init__()
+        if not isinstance(self.offset, int) or self.offset < 0:
             raise TypeError("Record's offset must be unsigned integer")
-        if not isinstance(self.key, bytes):
-            raise TypeError("Record's key must be bytes")
-        if not isinstance(self.value, bytes):
-            raise TypeError("Record's value must be bytes")
-        if self.headers:
-            if not isinstance(self.headers, tuple) and not isinstance(self.headers, list):
-                raise TypeError("Record's headers must be a tuple or a list")
 
     def as_tuple(self) -> tuple:
         if isinstance(self.headers, list):
@@ -90,7 +103,7 @@ class KRecord:
         return astuple(self)
 
     def __eq__(self, other) -> bool:
-        """Record is unambiguously determined by partition and offset."""
+        """Record is unambiguously determined by partition and offset (and pid if exists)."""
         return self.offset == other.offset and self.partition == other.partition
 
     def __str__(self) -> str:
@@ -128,10 +141,18 @@ class KTopic:
 
     name: str
     partition_no: int = field(default=1)
-    partitions: list[KPartition] = field(init=False, default_factory=list)
+    partitions: list[KPartition] = field(init=False, default_factory=list, repr=False)
     config: Optional[dict[str, Any]] = None
 
     def __post_init__(self):
         if not (isinstance(self.partition_no, int) and self.partition_no > 0):
             raise TypeError("Topic's partition number must be integer greater than 0")
         [self.partitions.append(KPartition()) for _ in range(self.partition_no)]
+
+    @classmethod
+    def from_env(cls, env_config: str) -> "KTopic":
+        try:
+            name, partition_no = env_config.split(":")
+        except ValueError:
+            name, partition_no = env_config, 1
+        return cls(name, int(partition_no))

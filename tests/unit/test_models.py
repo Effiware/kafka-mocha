@@ -14,19 +14,23 @@ def test_kheader_creation() -> None:
 def test_krecord_incorrect_creation_error_messages() -> None:
     """Test messages that are thrown when passing incorrect parameters."""
     with pytest.raises(TypeError) as err:
-        KRecord("foo", 0, "key1".encode("utf-8"), "value1".encode("utf-8"))
+        KRecord("topic", "partition", "key1".encode("utf-8"), "value1".encode("utf-8"), offset=0)
     assert "partition" in err.value.args[0]
 
     with pytest.raises(TypeError) as err:
-        KRecord(0, "bar", "key1".encode("utf-8"), "value1".encode("utf-8"))
+        KRecord("foo", 0, "key1".encode("utf-8"), "value1".encode("utf-8"))
+    assert "offset" in err.value.args[0]
+
+    with pytest.raises(TypeError) as err:
+        KRecord("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), offset="dupa")
     assert "offset" in err.value.args[0]
 
 
 def test_krecord_creation() -> None:
     """Test Creation of KRecord."""
     header = KHeader("hkey", "hvalue".encode("utf-8"))
-    rec1 = KRecord(0, 0, "key1".encode("utf-8"), "value1".encode("utf-8"), (header,))
-    rec2 = KRecord(0, 0, "key2".encode("utf-8"), "value2".encode("utf-8"), [header])
+    rec1 = KRecord("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), (header,), timestamp=5, offset=0)
+    rec2 = KRecord("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), [header], timestamp=7, offset=0)
 
     assert rec1 == rec2  # compares only partition and offset
     assert rec1.timestamp != rec2.timestamp
@@ -52,10 +56,10 @@ def test_appending_to_kpartition_() -> None:
     header1 = KHeader("key1", "value1".encode("utf-8"))
     header2 = KHeader("key2", "value2".encode("utf-8"))
 
-    rec1 = KRecord(0, 0, "key1".encode("utf-8"), "value1".encode("utf-8"), (header1,))
-    rec2 = KRecord(0, 1, "key2".encode("utf-8"), "value2".encode("utf-8"), [header1, header2])
-    rec3 = KRecord(0, 2, "key3".encode("utf-8"), "value3".encode("utf-8"), (header1, header2))
-    rec4 = KRecord(0, 3, "key4".encode("utf-8"), "value4".encode("utf-8"), [header2])
+    rec1 = KRecord("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), (header1,), offset=0)
+    rec2 = KRecord("topic", 0, "key2".encode("utf-8"), "value2".encode("utf-8"), [header1, header2], offset=1)
+    rec3 = KRecord("topic", 0, "key3".encode("utf-8"), "value3".encode("utf-8"), (header1, header2), offset=2)
+    rec4 = KRecord("topic", 0, "key4".encode("utf-8"), "value4".encode("utf-8"), [header2], offset=3)
 
     partition = KPartition()
     for rec in [rec1, rec2, rec3, rec4]:
@@ -63,8 +67,8 @@ def test_appending_to_kpartition_() -> None:
 
     assert len(partition._heap) == 4
     for existing, inserted in zip([rec1, rec2, rec3, rec4], partition._heap):
-        assert existing.partition == inserted[0]
-        assert existing.offset == inserted[1]
+        assert existing.partition == inserted[1]
+        assert existing.offset == inserted[7]
         assert existing.key == inserted[2]
         assert existing.value == inserted[3]
         for idx, header in enumerate(existing.headers):
