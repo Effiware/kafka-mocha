@@ -21,7 +21,7 @@ class TickingThread(Thread):
 
         while not self._stop_event.is_set():
             logger.debug(f"Buffer for {self._owner}: tick (+{self._tick.interval})...")
-            self._message_buffer.send(self._tick.interval)
+            # self._message_buffer.send(self._tick.interval)  # TODO: Check if not running first
             sleep(self._tick.interval)
         self._message_buffer.send(Tick.DONE)
 

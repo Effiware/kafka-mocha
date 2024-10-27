@@ -1,4 +1,6 @@
+from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import Literal, Callable, Any
 
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
@@ -6,6 +8,38 @@ from kafka_mocha.models import PMessage
 from kafka_mocha.signals import Tick, KSignals
 
 logger = get_custom_logger()
+
+
+def get_partitioner(
+    topics: dict[str, dict], strategy: Literal["default", "round-robin", "uniform-sticky"] = "default"
+) -> Callable[[str, bytes], int]:
+    """Strategy pattern (as closure) returning requested kafka producer partitioner."""
+    last_assigned_partitions = defaultdict(int)
+    logger.info(f"Closure context: {topics}")
+
+    match strategy:
+        case "default":
+
+            def partitioner(topic: str, key: bytes) -> int:
+                if topic not in topics:
+                    logger.info(f"Inner context: {topics}")
+                    return 0  # assumes that default partition number for newly created topics is 1
+                return abs(hash(key)) % topics[topic]["partition_no"]
+
+        case "round-robin":
+
+            def partitioner(topic: str, _) -> int:
+                if topic not in topics:
+                    return 0
+                last_partition = last_assigned_partitions[topic]
+                available_partitions = topics[topic]["partition_no"]
+                new_partition = 0 if last_partition == available_partitions - 1 else last_partition + 1
+                last_assigned_partitions[topic] = new_partition
+                return new_partition
+
+        case _:
+            raise NotImplemented(f"Custom strategy and/or {strategy} not yet implemented.")
+    return partitioner
 
 
 def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 20):
@@ -19,30 +53,33 @@ def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 20):
     buffer_elapsed_time = 0
     buffer_loop_no = 0
     kafka_simulator = KafkaSimulator()
+    partitioner = get_partitioner(kafka_simulator.get_topics())
 
     producer_protocol = kafka_simulator.handle_producers()
     producer_protocol.send(KSignals.INIT.value)
     res = KSignals.BUFFERED
     while True:
         while len(buffer) < buffer_size:  # TODO: byte size instead of length
-            new_msg = yield res
+            new_msg: PMessage | int = yield res
             if isinstance(new_msg, int):
                 if new_msg == Tick.DONE:
                     logger.info(f"Buffer for {owner}: received done signal, finishing...")
                     break
                 else:
-                    logger.info(f"Buffer for {owner}: checking elapsed time: {buffer_elapsed_time}")
+                    logger.debug(f"Buffer for {owner}: checking elapsed time: {buffer_elapsed_time}")
                     buffer_elapsed_time += new_msg
                     if buffer_elapsed_time >= buffer_timeout:
                         break
             else:
+                new_msg.timestamp = (
+                    buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
+                ).timestamp()
+                new_msg.partition = (
+                    partitioner(new_msg.topic, new_msg.key) if new_msg.partition == -1 else new_msg.partition
+                )
                 buffer.append(new_msg)
                 res = KSignals.BUFFERED
         if buffer:
-            for msg in buffer:
-                msg.timestamp = (
-                    buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
-                ).timestamp()
             res = producer_protocol.send(buffer)
             logger.info(f"Buffer for {owner}: Kafka response: {res}")
         else:

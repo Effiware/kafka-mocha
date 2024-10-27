@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, astuple, replace, asdict
 from datetime import datetime
 from enum import Enum, auto
 from heapq import heappush
-from typing import Any, Optional, Callable
+from typing import Any, Optional, Callable, Literal
 
 
 class CompressionType(Enum):
@@ -49,15 +49,13 @@ class ABCMessage(ABC):
     compression_type: CompressionType = field(default=CompressionType.NONE, compare=False, kw_only=True)
 
     def __post_init__(self):
-        if not (isinstance(self.partition, int) and self.partition >= 0):
-            raise TypeError("Record's partition must be unsigned integer")
         if not isinstance(self.key, bytes):
-            raise TypeError("Record's key must be bytes")
+            raise TypeError("Message's key must be bytes")
         if not isinstance(self.value, bytes):
-            raise TypeError("Record's value must be bytes")
+            raise TypeError("Message's value must be bytes")
         if self.headers:
             if not isinstance(self.headers, tuple) and not isinstance(self.headers, list):
-                raise TypeError("Record's headers must be a tuple or a list")
+                raise TypeError("Message's headers must be a tuple or a list")
         if self.__class__ == ABCMessage:
             raise TypeError("Cannot instantiate an abstract class.")
 
@@ -68,6 +66,11 @@ class PMessage(ABCMessage):
 
     on_delivery: Optional[Callable[[Any, Any], None]] = field(default=None, kw_only=True)
     pid: Optional[int] = field(default=None, kw_only=True)
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.partition, int) or self.partition < -1:  # -1 is a flag to run partitioner
+            raise TypeError("PMessage's partition must be an unsigned integer (or -1).")
 
     @classmethod
     def from_producer_data(cls, *, headers: tuple | list, timestamp: int, **kwargs) -> "PMessage":
@@ -85,14 +88,10 @@ class KRecord(ABCMessage):
     offset: int = field(default=-1, kw_only=True)
     pid: Optional[int] = field(default=None, kw_only=True)
 
-    @classmethod
-    def from_pmessage(cls, pmessage: PMessage, offset: int) -> "KRecord":
-        pmessage_dict = asdict(pmessage)
-        del pmessage_dict["on_delivery"]
-        return cls(**pmessage_dict, offset=offset)
-
     def __post_init__(self):
         super().__post_init__()
+        if not isinstance(self.partition, int) or self.partition < 0:
+            raise TypeError("Record's partition must be an unsigned integer")
         if not isinstance(self.offset, int) or self.offset < 0:
             raise TypeError("Record's offset must be unsigned integer")
 
@@ -101,6 +100,23 @@ class KRecord(ABCMessage):
             copy = replace(self, headers=tuple(self.headers))
             return astuple(copy)
         return astuple(self)
+
+    @classmethod
+    def from_pmessage(
+        cls,
+        pmessage: PMessage,
+        offset: int,
+        ts_type: Literal["EventTime", "LogAppendTime"] = "EventTime",
+        ts: Optional[int] = None,
+    ) -> "KRecord":
+        """Create KRecord from PMessage (producer message) depending on configuration"""
+        pmessage_dict = asdict(pmessage)
+        del pmessage_dict["on_delivery"]
+        if ts_type == "LogAppendTime" and ts is None:
+            raise TypeError(f"Timestamp must be provided when {ts_type} is used.")
+        elif ts_type == "LogAppendTime":
+            cls(**pmessage_dict, offset=offset, timestamp=ts)
+        return cls(**pmessage_dict, offset=offset)
 
     def __eq__(self, other) -> bool:
         """Record is unambiguously determined by partition and offset (and pid if exists)."""

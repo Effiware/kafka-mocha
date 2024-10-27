@@ -57,6 +57,6 @@ class KProducer:
 
 
 producer = KProducer({})
-producer.produce("topic", "key".encode(), "value".encode(), 0, on_delivery=lambda *_: None)
+producer.produce("topic-1", "key".encode(), "value".encode(), on_delivery=lambda *_: None)
 
 producer._done()

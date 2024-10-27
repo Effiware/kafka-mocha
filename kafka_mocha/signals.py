@@ -6,7 +6,7 @@ class Tick:
 
     def __init__(self, interval: int):
         if interval <= 0:
-            raise ValueError("Tick interval must be a positive integer")
+            raise ValueError("Tick interval must be an unsigned integer.")
         self.interval = interval
 
 
