@@ -6,11 +6,15 @@ from typing import Literal, Any
 def get_filter(strategy: Literal["all", "kafka-only"]) -> Callable[[Any], bool]:
     match strategy:
         case "all":
-            def _filter(_: Any) -> bool:
+
+            def _filter(_) -> bool:
                 return True
+
         case "kafka-only":
+
             def _filter(record: Any) -> bool:
                 return record.module == "kafka_simulator"
+
         case _:
             raise ValueError(f"Unknown filter strategy {strategy}")
     return _filter

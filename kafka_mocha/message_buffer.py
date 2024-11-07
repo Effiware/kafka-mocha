@@ -15,14 +15,12 @@ def get_partitioner(
 ) -> Callable[[str, bytes], int]:
     """Strategy pattern (as closure) returning requested kafka producer partitioner."""
     last_assigned_partitions = defaultdict(int)
-    logger.info(f"Closure context: {topics}")
 
     match strategy:
         case "default":
 
             def partitioner(topic: str, key: bytes) -> int:
                 if topic not in topics:
-                    logger.info(f"Inner context: {topics}")
                     return 0  # assumes that default partition number for newly created topics is 1
                 return abs(hash(key)) % topics[topic]["partition_no"]
 

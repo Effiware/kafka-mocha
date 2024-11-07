@@ -1,3 +1,4 @@
+from inspect import getgeneratorstate, GEN_SUSPENDED
 from threading import Thread, Event
 from time import sleep
 
@@ -20,8 +21,10 @@ class TickingThread(Thread):
         logger.info(f"Buffer for {self._owner}: ticking started")
 
         while not self._stop_event.is_set():
-            logger.debug(f"Buffer for {self._owner}: tick (+{self._tick.interval})...")
-            # self._message_buffer.send(self._tick.interval)  # TODO: Check if not running first
+            # logger.debug(f"Buffer for {self._owner}: tick (+{self._tick.interval})...")
+            logger.debug(f"Buffer for {self._owner} in state: {getgeneratorstate(self._message_buffer)}")
+            # if getgeneratorstate(self._message_buffer) == GEN_SUSPENDED:
+            #     self._message_buffer.send(self._tick.interval)
             sleep(self._tick.interval)
         self._message_buffer.send(Tick.DONE)
 

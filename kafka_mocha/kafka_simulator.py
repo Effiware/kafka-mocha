@@ -22,14 +22,12 @@ class KafkaSimulator:
     _instance = None
     _is_running = False
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls):
         if not cls._instance:
             cls._instance = super(KafkaSimulator, cls).__new__(cls)
         return cls._instance
 
-    def __init__(
-        self,
-    ):
+    def __init__(self):
         self.one_ack_delay = ONE_ACK_DELAY
         self.all_ack_delay = ALL_ACK_DELAY
         self.topics = [KTopic.from_env(topic) for topic in TOPICS]

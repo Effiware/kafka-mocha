@@ -1,11 +1,8 @@
-import logging
-
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.kproducer import KProducer
 
 
-def test_kafka_simulator_bootstrap(caplog):
-    caplog.set_level(logging.DEBUG)
+def test_kafka_simulator_bootstrap():
     kafka = KafkaSimulator()
     producer = KProducer({})
 
