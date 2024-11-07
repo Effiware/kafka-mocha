@@ -40,7 +40,7 @@ def get_partitioner(
     return partitioner
 
 
-def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 20):
+def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 2):
     """Start off with 1:1 relation to KProducer or KConsumer.
 
     Does not support custom timestamps (yet).
@@ -58,15 +58,16 @@ def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 20):
     res = KSignals.BUFFERED
     while True:
         while len(buffer) < buffer_size:  # TODO: byte size instead of length
-            new_msg: PMessage | int = yield res
-            if isinstance(new_msg, int):
+            new_msg: PMessage | int | float = yield res
+            if isinstance(new_msg, int) or isinstance(new_msg, float):
                 if new_msg == Tick.DONE:
                     logger.info(f"Buffer for {owner}: received done signal, finishing...")
                     break
                 else:
-                    logger.debug(f"Buffer for {owner}: checking elapsed time: {buffer_elapsed_time}")
                     buffer_elapsed_time += new_msg
+                    logger.debug(f"Buffer for {owner}: checking elapsed time: {buffer_elapsed_time}")
                     if buffer_elapsed_time >= buffer_timeout:
+                        logger.debug(f"Buffer for {owner}: forcing flush due to timeout...")
                         break
             else:
                 new_msg.timestamp = (

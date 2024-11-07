@@ -1,3 +1,5 @@
+from inspect import getgeneratorstate, GEN_SUSPENDED
+from time import sleep
 from typing import Any
 
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
@@ -17,7 +19,7 @@ class KProducer:
         self.config = dict(config)
         self._key_serializer = self.config.pop("key.serializer", None)
         self._value_serializer = self.config.pop("value.serializer", None)
-        self._message_buffer = message_buffer(f"KProducer({id(self)})", self.config.pop("message.buffer", 3))
+        self._message_buffer = message_buffer(f"KProducer({id(self)})", self.config.pop("message.buffer", 300))
         self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._message_buffer)
 
         self._message_buffer.send(KSignals.INIT.value)
@@ -37,18 +39,31 @@ class KProducer:
             except Exception as se:
                 raise ValueSerializationError(se)
 
-        ack = self._message_buffer.send(
-            PMessage.from_producer_data(
-                topic=topic,
-                partition=partition,
-                key=key,
-                value=value,
-                timestamp=timestamp,
-                headers=headers,
-                on_delivery=on_delivery,
-            )
-        )
-        logger.info(f"KProducer({id(self)}): received ack: {ack}")
+        MAX_COUNT = 3
+        count = 0
+        while count < MAX_COUNT:
+            if getgeneratorstate(self._message_buffer) == GEN_SUSPENDED:
+                ack = self._message_buffer.send(
+                    PMessage.from_producer_data(
+                        topic=topic,
+                        partition=partition,
+                        key=key,
+                        value=value,
+                        timestamp=timestamp,
+                        headers=headers,
+                        on_delivery=on_delivery,
+                    )
+                )
+                logger.info(f"KProducer({id(self)}): received ack: {ack}")
+                break
+            else:
+                sleep(count ** 2 * 0.1)  # TODO: make it better
+                logger.info(f"KProducer({id(self)}): buffer is busy")
+                count += 1
+        if 0 < count < MAX_COUNT:
+            logger.warning(f"KProducer({id(self)}): succeeded in {count} try")
+        elif count == MAX_COUNT:
+            raise Exception("Exceeded max retries")
 
     def _done(self):
         self._ticking_thread.stop()
@@ -56,7 +71,7 @@ class KProducer:
         self._message_buffer.close()
 
 
-producer = KProducer({})
-producer.produce("topic-1", "key".encode(), "value".encode(), on_delivery=lambda *_: None)
-
-producer._done()
+# producer = KProducer({})
+# producer.produce("topic-1", "key".encode(), "value".encode(), on_delivery=lambda *_: None)
+#
+# producer._done()

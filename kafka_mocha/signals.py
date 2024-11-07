@@ -4,9 +4,9 @@ from enum import Enum
 class Tick:
     DONE = -1
 
-    def __init__(self, interval: int):
-        if interval <= 0:
-            raise ValueError("Tick interval must be an unsigned integer.")
+    def __init__(self, interval: int | float):
+        if interval <= 0.0:
+            raise ValueError("Tick interval must be an unsigned integer or float.")
         self.interval = interval
 
 
