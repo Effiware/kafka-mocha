@@ -1,3 +1,6 @@
+import os
+
+from importlib import reload
 from pytest import fixture
 
 @fixture
@@ -7,5 +10,20 @@ def foo_header() -> tuple:
 
 @fixture(scope="function")
 def fresh_kafka():
-    from kafka_mocha.kafka_simulator import KafkaSimulator
-    return KafkaSimulator()
+    """Returns fresh (reloaded) KafkaSimulator singleton instance"""
+    import kafka_mocha.kafka_simulator
+    reload(kafka_mocha.kafka_simulator)
+    return kafka_mocha.kafka_simulator.KafkaSimulator()
+
+
+
+@fixture(scope="function")
+def fresh_kafka_auto_topic_create_off():
+    """Yields fresh (reloaded) KafkaSimulator singleton instance with auto topic create off"""
+    old_value = os.environ.get("KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE", "true")
+    os.environ["KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE"] = "false"
+
+    import kafka_mocha.kafka_simulator
+    reload(kafka_mocha.kafka_simulator)
+    yield kafka_mocha.kafka_simulator.KafkaSimulator()
+    os.environ["KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE"] = old_value

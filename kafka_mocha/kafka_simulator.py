@@ -1,5 +1,8 @@
 import json
 import os
+from typing import Optional
+
+from confluent_kafka.admin import ClusterMetadata, BrokerMetadata, TopicMetadata, PartitionMetadata
 
 from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaServerBootstrapException
 from kafka_mocha.klogger import get_custom_logger
@@ -31,25 +34,58 @@ class KafkaSimulator:
         self.one_ack_delay = ONE_ACK_DELAY
         self.all_ack_delay = ALL_ACK_DELAY
         self.topics = [KTopic.from_env(topic) for topic in TOPICS]
+        self.topics.append(KTopic("_schemas"))  #  Built-in `_schemas` topic
+        self.topics.append(KTopic("__consumer_offsets"))  #  Built-in `__consumer_offsets` topic
         logger.info(f"Kafka Simulator initialized")
         logger.debug(f"Registered topics: {self.topics}")
 
-    def get_topics(self, topic_name: str = None) -> dict[str, dict]:
-        if topic_name is None:
-            return {topic.name: {"partition_no": topic.partition_no, "config": topic.config} for topic in self.topics}
+    def _topics_2_cluster_metadata(self, topics: Optional[list[KTopic]] = None) -> ClusterMetadata:
+        """Converts KTopics into ClusterMetadata (stubbed)."""
+        def _t_metadata_factory(_topic: KTopic) -> TopicMetadata:
+            partitions = dict()
+            for idx, _ in enumerate(_topic.partitions):
+                p_metadata = PartitionMetadata()
+                p_metadata.id = idx
+                p_metadata.leader = 1
+                p_metadata.replicas = [1]
+                p_metadata.isrs = [1]
+                partitions[idx] = p_metadata
 
-        topic = list(filter(lambda topic: topic.name == topic_name, self.topics))
-        if topic:
-            return {topic[0].name: {"partition_no": topic[0].partition_no, "config": topic[0].config}}
+            t_metadata = TopicMetadata()
+            t_metadata.topic = _topic.name
+            t_metadata.partitions = partitions
+            return t_metadata
+
+        _topics = topics if topics is not None else self.topics
+        ts_metadata = {topic.name: _t_metadata_factory(topic) for topic in _topics}
+
+        b_metadata = BrokerMetadata()
+        b_metadata.id = 1
+        b_metadata.host = '127.0.0.1'
+        b_metadata.port = 9092
+
+        c_metadata = ClusterMetadata()
+        c_metadata.cluster_id = "___KAFKA_SIMULATOR____"
+        c_metadata.controller_id = 1
+        c_metadata.brokers = b_metadata
+        c_metadata.topics = ts_metadata
+        c_metadata.orig_broker_name = 'localhost:9092/bootstrap'
+        return c_metadata
+
+
+    def get_topics(self, topic_name: str = None) -> ClusterMetadata:
+        if topic_name is None:
+            return self._topics_2_cluster_metadata()
+
+        matching_topics = list(filter(lambda x: x.name == topic_name, self.topics))
+        if matching_topics:
+            return self._topics_2_cluster_metadata(matching_topics)
         elif AUTO_CREATE_TOPICS_ENABLE:
             self.topics.append(KTopic(topic_name, 1))
-            return {
-                topic.name: {"partition_no": topic.partition_no, "config": topic.config}
-                for topic in self.topics
-                if topic.name == topic_name
-            }
+            matching_topics = list(filter(lambda x: x.name == topic_name, self.topics))
+            return self._topics_2_cluster_metadata(matching_topics)
         else:
-            return {}
+            return self._topics_2_cluster_metadata([])
 
     def handle_producers(self):
         logger.info("Handle producers has been primed")

@@ -1,4 +1,5 @@
 from confluent_kafka import Producer
+from confluent_kafka.admin import ClusterMetadata
 
 from logging import getLogger
 

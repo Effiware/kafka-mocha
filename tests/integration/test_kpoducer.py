@@ -35,7 +35,7 @@ def test_kafka_simulator_received_messages__medium_running_task():
     no_msg_to_produce = 1000
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.01)
-        producer.produce("topic-1", f"key-{idx}".encode(), "value".encode(), on_delivery=lambda *_: None)
+        producer.produce("topic-1", f"key-{idx}".encode(), "value".encode())
 
     producer._done()
 
