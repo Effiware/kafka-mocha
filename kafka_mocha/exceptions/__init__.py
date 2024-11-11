@@ -4,3 +4,7 @@ class KafkaSimulatorBootstrapException(Exception):
 
 class KafkaServerBootstrapException(Exception):
     pass
+
+
+class KProducerMaxRetryException(Exception):
+    pass

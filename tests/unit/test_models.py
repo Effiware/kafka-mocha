@@ -1,6 +1,8 @@
+from datetime import datetime
+
 import pytest
 
-from kafka_mocha.models import KHeader, KRecord, KTopic, KPartition
+from kafka_mocha.models import KHeader, KRecord, KTopic, KPartition, PMessage
 
 
 def test_kheader_creation() -> None:
@@ -24,6 +26,27 @@ def test_krecord_incorrect_creation_error_messages() -> None:
     with pytest.raises(TypeError) as err:
         KRecord("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), offset="dupa")
     assert "offset" in err.value.args[0]
+
+
+def test_pmessage_creation_constructor(foo_header: KHeader) -> None:
+    """Test Creation of Producer Message using constructor."""
+    PMessage.from_producer_data(
+        topic="test-topic",
+        partition=0,
+        key="byte-key".encode("utf-8"),
+        value="byte-value".encode("utf-8"),
+        timestamp=0,
+        headers=(foo_header,),
+    )
+    PMessage.from_producer_data(
+        topic="test-topic",
+        partition=1,
+        key="string-key",
+        value="string-value",
+        timestamp=datetime.now().timestamp(),
+        headers=None,
+        on_delivery=lambda *_: None,
+    )
 
 
 def test_krecord_creation() -> None:

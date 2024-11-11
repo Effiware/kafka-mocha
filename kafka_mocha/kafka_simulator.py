@@ -34,8 +34,22 @@ class KafkaSimulator:
         logger.info(f"Kafka Simulator initialized")
         logger.debug(f"Registered topics: {self.topics}")
 
-    def get_topics(self) -> dict[str, dict]:
-        return {topic.name: {"partition_no": topic.partition_no, "config": topic.config} for topic in self.topics}
+    def get_topics(self, topic_name: str = None) -> dict[str, dict]:
+        if topic_name is None:
+            return {topic.name: {"partition_no": topic.partition_no, "config": topic.config} for topic in self.topics}
+
+        topic = list(filter(lambda topic: topic.name == topic_name, self.topics))
+        if topic:
+            return {topic[0].name: {"partition_no": topic[0].partition_no, "config": topic[0].config}}
+        elif AUTO_CREATE_TOPICS_ENABLE:
+            self.topics.append(KTopic(topic_name, 1))
+            return {
+                topic.name: {"partition_no": topic.partition_no, "config": topic.config}
+                for topic in self.topics
+                if topic.name == topic_name
+            }
+        else:
+            return {}
 
     def handle_producers(self):
         logger.info("Handle producers has been primed")

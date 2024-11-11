@@ -75,6 +75,10 @@ class PMessage(ABCMessage):
     @classmethod
     def from_producer_data(cls, *, headers: tuple | list, timestamp: int, **kwargs) -> "PMessage":
         k_headers = [KHeader.from_tuple(header) for header in headers] if headers else []
+        _key = kwargs.pop("key", None)
+        _value = kwargs.pop("value", None)
+        kwargs["key"] = _key.encode() if isinstance(_key, str) else _key
+        kwargs["value"] = _value.encode() if isinstance(_value, str) else _value
         if timestamp != 0:
             _timestamp = timestamp / 1000
             return cls(headers=k_headers, timestamp=_timestamp, **kwargs)
