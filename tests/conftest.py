@@ -8,6 +8,13 @@ def foo_header() -> tuple:
     return "header_key", "header_value".encode("utf-8")
 
 
+@fixture(scope="module")
+def kafka():
+    """Returns KafkaSimulator singleton instance"""
+    import kafka_mocha.kafka_simulator
+    return kafka_mocha.kafka_simulator.KafkaSimulator()
+
+
 @fixture(scope="function")
 def fresh_kafka():
     """Returns fresh (reloaded) KafkaSimulator singleton instance"""
@@ -27,3 +34,10 @@ def fresh_kafka_auto_topic_create_off():
     reload(kafka_mocha.kafka_simulator)
     yield kafka_mocha.kafka_simulator.KafkaSimulator()
     os.environ["KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE"] = old_value
+
+
+@fixture()
+def kproducer(kafka):
+    import kafka_mocha.kproducer
+    reload(kafka_mocha.kproducer)
+    return kafka_mocha.kproducer.KProducer({})

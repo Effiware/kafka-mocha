@@ -1,7 +1,11 @@
 import json
 import os
 
+import pytest
 
+
+@pytest.mark.usefixtures("fresh_kafka")
+# @pytest.mark.parametrize("kafka", [fresh_kafka], scope="function")
 def test_kafka_simulator_bootstrap(fresh_kafka):
     assert fresh_kafka is not None
     assert fresh_kafka._instance is not None

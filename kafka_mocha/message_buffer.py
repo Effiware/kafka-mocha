@@ -51,7 +51,9 @@ def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 2):
     buffer_elapsed_time = 0
     buffer_loop_no = 0
     kafka_simulator = KafkaSimulator()
-    partitioner = get_partitioner(kafka_simulator.get_topics())
+    partitioner = get_partitioner(
+        {topic.name: {"partition_no": topic.partition_no} for topic in kafka_simulator.topics}
+    )
 
     producer_protocol = kafka_simulator.handle_producers()
     producer_protocol.send(KSignals.INIT.value)
