@@ -30,11 +30,23 @@ class KProducer:
         self._kafka_simulator = KafkaSimulator()
         self._ticking_thread.start()
 
+    def begin_transaction(self):
+        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+
+    def commit_transaction(self):
+        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+
+    def abort_transaction(self):
+        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+
+    def init_transactions(self):
+        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+
     def list_topics(self, topic: str = None, timeout: float = -1.0, *args, **kwargs):
         if timeout != -1.0:
             logger.warning("KProducer doesn't support timing out for this method. Parameter will be ignored.")
 
-        return self._kafka_simulator.get_topics(topic)
+        return self._kafka_simulator.get_cluster_mdata(topic)
 
     def produce(self, topic, value=None, key=None, partition=-1, on_delivery=None, timestamp=0, headers=None) -> None:
         ctx = SerializationContext(topic, MessageField.KEY, headers)

@@ -73,7 +73,7 @@ class KafkaSimulator:
         return c_metadata
 
 
-    def get_topics(self, topic_name: str = None) -> ClusterMetadata:
+    def get_cluster_mdata(self, topic_name: str = None) -> ClusterMetadata:
         if topic_name is None:
             return self._topics_2_cluster_metadata()
 

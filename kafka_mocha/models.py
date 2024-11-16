@@ -5,6 +5,8 @@ from enum import Enum, auto
 from heapq import heappush
 from typing import Any, Optional, Callable, Literal
 
+from confluent_kafka import TIMESTAMP_CREATE_TIME
+
 
 class CompressionType(Enum):
     """https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html#compression-type"""
@@ -45,7 +47,7 @@ class ABCMessage(ABC):
     key: bytes
     value: bytes
     headers: Optional[tuple[KHeader, ...] | list[KHeader]] = field(default=None, compare=False)
-    timestamp: int = field(default=0, kw_only=True)
+    timestamp: tuple[int, int] = field(default=(TIMESTAMP_CREATE_TIME, -1), kw_only=True)
     compression_type: CompressionType = field(default=CompressionType.NONE, compare=False, kw_only=True)
 
     def __post_init__(self):
