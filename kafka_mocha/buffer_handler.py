@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Literal, Callable, Any
+from typing import Literal, Callable
 
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
@@ -40,13 +40,13 @@ def get_partitioner(
     return partitioner
 
 
-def message_buffer(owner: str, buffer_size: int, buffer_timeout: int = 2):
+def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2):
     """Start off with 1:1 relation to KProducer or KConsumer.
 
     Does not support custom timestamps (yet).
     """
     logger.info(f"Buffer for {owner} has been primed, size: {buffer_size}, timeout: {buffer_timeout}")
-    buffer: list[PMessage] = []  # TODO: consider bytearray() or heap
+    # buffer: list[PMessage] = []  # TODO: consider bytearray() or heap
     buffer_start_time = datetime.now()
     buffer_elapsed_time = 0
     buffer_loop_no = 0
