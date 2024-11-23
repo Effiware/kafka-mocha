@@ -2,7 +2,7 @@ from inspect import getgeneratorstate, GEN_SUSPENDED
 from time import sleep
 from typing import Any
 
-from confluent_kafka import TopicPartition
+from confluent_kafka import TopicPartition, KafkaException
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
 from confluent_kafka.serialization import SerializationContext, MessageField
 
@@ -11,7 +11,7 @@ from kafka_mocha.exceptions import KProducerMaxRetryException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
-from kafka_mocha.signals import KSignals
+from kafka_mocha.signals import KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
 
 logger = get_custom_logger()
@@ -29,21 +29,44 @@ class KProducer:
         self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
         self._max_retry_count = 3
         self._retry_backoff = 0.01
+        self.transaction_inited = False
+        self.transaction_begun = False
 
         self._buffer_handler.send(KSignals.INIT.value)
         self._kafka_simulator = KafkaSimulator()
         self._ticking_thread.start()
 
+    def abort_transaction(self):
+        self.purge()
+
     def begin_transaction(self):
-        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+        if not self.transaction_inited:
+            raise KafkaException("TODO")
+        if not self._ticking_thread.is_alive():
+            self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
+        self.transaction_begun = True
 
     def commit_transaction(self):
-        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+        self._done()
 
-    def abort_transaction(self):
-        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+    def flush(self, timeout: float = None):
+        """Duck type for confluent_kafka/cimpl.py::flush (see signature there).
+
+        Sends `DONE` signal to message buffer handler in order to force sending buffered messages to Kafka Simulator.
+        """
+        count = 0
+        while count < self._max_retry_count:
+            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
+                self._buffer_handler.send(Tick.DONE)
+                break
+            else:
+                count += 1
+                sleep(count**2 * self._retry_backoff)
+        else:
+            raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
 
     def init_transactions(self):
+        self.transaction_inited = True
         logger.warning("KProducer doesn't support transactions (yet). Skipping...")
 
     def list_topics(self, topic: str = None, timeout: float = -1.0, *args, **kwargs):
@@ -107,7 +130,7 @@ class KProducer:
     def send_offsets_to_transaction(
         self, positions: list[TopicPartition], group_metadata: object, timeout: float = None
     ):
-        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+        raise NotImplementedError("Transactions are not yet fully supported in Kafka Mocha.")
 
     def set_sasl_credentials(self, *args, **kwargs):
         pass
