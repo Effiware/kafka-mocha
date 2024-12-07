@@ -46,7 +46,6 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
     Does not support custom timestamps (yet).
     """
     logger.info(f"Buffer for {owner} has been primed, size: {buffer_size}, timeout: {buffer_timeout}")
-    # buffer: list[PMessage] = []  # TODO: consider bytearray() or heap
     buffer_start_time = datetime.now()
     buffer_elapsed_time = 0
     buffer_loop_no = 0

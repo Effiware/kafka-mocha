@@ -9,6 +9,7 @@ def mock_producer(cls):
     :param cls:
     :return:
     """
+
     @wraps(cls)
     def wrapper(*args, **kwargs):
         return KProducer(*args, **kwargs)
@@ -21,4 +22,4 @@ def producer_factory(_conf):
     return ConfluentProducer(_conf)
 
 
-producer = producer_factory({'bootstrap.servers': 'localhost:9092'})
+# producer = producer_factory({'bootstrap.servers': 'localhost:9092'})

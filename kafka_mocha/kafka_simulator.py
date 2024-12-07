@@ -1,5 +1,6 @@
 import json
 import os
+from threading import Lock
 from typing import Optional
 
 from confluent_kafka.admin import ClusterMetadata, BrokerMetadata, TopicMetadata, PartitionMetadata
@@ -23,11 +24,14 @@ logger = get_custom_logger()
 
 class KafkaSimulator:
     _instance = None
+    _lock = Lock()
     _is_running = False
 
     def __new__(cls):
         if not cls._instance:
-            cls._instance = super(KafkaSimulator, cls).__new__(cls)
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -41,6 +45,7 @@ class KafkaSimulator:
 
     def _topics_2_cluster_metadata(self, topics: Optional[list[KTopic]] = None) -> ClusterMetadata:
         """Converts KTopics into ClusterMetadata (stubbed)."""
+
         def _t_metadata_factory(_topic: KTopic) -> TopicMetadata:
             partitions = dict()
             for idx, _ in enumerate(_topic.partitions):
@@ -61,7 +66,7 @@ class KafkaSimulator:
 
         b_metadata = BrokerMetadata()
         b_metadata.id = 1
-        b_metadata.host = '127.0.0.1'
+        b_metadata.host = "127.0.0.1"
         b_metadata.port = 9092
 
         c_metadata = ClusterMetadata()
@@ -69,9 +74,8 @@ class KafkaSimulator:
         c_metadata.controller_id = 1
         c_metadata.brokers = b_metadata
         c_metadata.topics = ts_metadata
-        c_metadata.orig_broker_name = 'localhost:9092/bootstrap'
+        c_metadata.orig_broker_name = "localhost:9092/bootstrap"
         return c_metadata
-
 
     def get_cluster_mdata(self, topic_name: str = None) -> ClusterMetadata:
         if topic_name is None:

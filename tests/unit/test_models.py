@@ -74,6 +74,7 @@ def test_ktopic_creation() -> None:
     for partition in topic1.partitions:
         assert isinstance(partition, KPartition)
 
+
 def test_appending_to_kpartition_() -> None:
     """Test appending Krecords to KPartition."""
     header1 = KHeader("key1", "value1".encode("utf-8"))

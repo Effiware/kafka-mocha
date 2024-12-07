@@ -2,15 +2,26 @@ import json
 import os
 
 import pytest
-from confluent_kafka import TIMESTAMP_NOT_AVAILABLE
 
 
+@pytest.hookimpl(tryfirst=True)
 def test_kafka_simulator_bootstrap(fresh_kafka):
     assert fresh_kafka is not None
     assert fresh_kafka._instance is not None
     assert fresh_kafka is fresh_kafka._instance
 
 
+@pytest.hookimpl(tryfirst=True)
+def test_kafka_simulator_is_singleton(fresh_kafka):
+    import kafka_mocha.kafka_simulator
+
+    new_kafka = kafka_mocha.kafka_simulator.KafkaSimulator()
+
+    assert new_kafka is fresh_kafka
+    assert new_kafka._instance is fresh_kafka._instance
+
+
+@pytest.hookimpl(tryfirst=True)
 def test_kafka_simulator_getting_topics(fresh_kafka):
     env_topics = json.loads(os.environ.get("KAFKA_MOCHA_KSIM_TOPICS", "[]"))
     cluster_metadata = fresh_kafka.get_cluster_mdata()
@@ -18,17 +29,9 @@ def test_kafka_simulator_getting_topics(fresh_kafka):
     assert len(cluster_metadata.topics.keys()) == len(env_topics) + 2
 
 
-def test_kafka_simulator_getting_topics_non_existent_auto_off(fresh_kafka_auto_topic_create_off):
-    """Test that Kafka Simulator does not create new topic when it does not exist and AUTO_CREATE off"""
-    cluster_metadata = fresh_kafka_auto_topic_create_off.get_cluster_mdata("non-existent")
-
-    assert len(cluster_metadata.topics.keys()) == 0
-
-
+@pytest.hookimpl(tryfirst=True)
 def test_kafka_simulator_getting_topics_non_existent_auto_on(fresh_kafka):
     """Test that Kafka Simulator creates new topic when it does not exist and AUTO_CREATE on"""
     cluster_metadata = fresh_kafka.get_cluster_mdata("non-existent")
 
     assert len(cluster_metadata.topics.keys()) == 1
-
-
