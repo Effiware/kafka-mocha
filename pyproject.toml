@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kafka-mocha"
-version = "0.1.0"
+version = "0.1.0a1"
 description = "A Kafka mock library that is designed to be used in integration tests for applications using librdkafka."
 license = "MIT"
 authors = ["and-ratajski <andrzej.ratajski@effiware.com>"]
