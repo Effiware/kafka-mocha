@@ -35,9 +35,9 @@ jobs:
 
       - name: Build release distributions
         run: |
-          python -m poetry version ${{ github.event.release.name }} --no-interaction
-          python -m poetry install --without test --no-interaction
-          python -m poetry build --no-interaction
+          python3 -m poetry version ${{ github.event.release.name }} --no-interaction
+          python3 -m poetry install --without test --no-interaction
+          python3 -m poetry build --no-interaction
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
