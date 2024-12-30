@@ -3,10 +3,10 @@ name = "kafka-mocha"
 version = "0.1.0a1"
 description = "A Kafka mock library that is designed to be used in integration tests for applications using librdkafka."
 license = "MIT"
-authors = ["and-ratajski <andrzej.ratajski@effiware.com>"]
+authors = ["and-ratajski <and.ratajski@effiware.com>"]
 readme = "README.md"
-homepage = "https://python-poetry.org/"
-repository = "https://github.com/python-poetry/poetry"
+homepage = "https://github.com/Effiware/kafka-mocha/wiki"
+repository = "https://github.com/Effiware/kafka-mocha"
 packages = [{include = "kafka_mocha"}]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -22,6 +22,7 @@ confluent-kafka = "^2.6.0"
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.3"
 pytest-env = "^1.1.5"
+moto = "^5.0.24"
 
 [build-system]
 requires = ["poetry-core"]

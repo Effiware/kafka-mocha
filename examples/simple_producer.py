@@ -1,12 +1,19 @@
+from kafka_mocha.wrappers import mock_producer, MockProducer
 import sys
 from datetime import datetime
 
-from confluent_kafka import Producer
+# from confluent_kafka import Producer
+import confluent_kafka
+# from confluent_kafka import Producer
 
 
+
+# @mock_producer
+@MockProducer()
 def main(args):
     topic = args[1]
-    producer = Producer({"bootstrap.servers": "localhost:9092"})
+    # producer = Producer({"bootstrap.servers": "localhost:9092"})
+    producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
 
     while True:
         try:
