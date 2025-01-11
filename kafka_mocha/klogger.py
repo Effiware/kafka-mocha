@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Callable
-from typing import Literal, Any
+from typing import Any, Literal
 
 
 def get_filter(strategy: Literal["all", "kafka-only"]) -> Callable[[Any], bool]:

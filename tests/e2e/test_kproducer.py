@@ -8,6 +8,10 @@ logger = getLogger(__name__)
 
 def delivery_report(err, msg):
     """Called once for each message produced to indicate delivery result. Triggered by poll() or flush()."""
+    print(err)
+    # print(err.__dict__)
+    print(msg)
+    print(msg.topic())
     if err is not None:
         logger.error("Message delivery failed: {}".format(err))
     else:

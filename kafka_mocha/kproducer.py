@@ -1,13 +1,14 @@
-from inspect import getgeneratorstate, GEN_SUSPENDED
-from time import sleep
-from typing import Any
+import signal
+from inspect import GEN_SUSPENDED, getgeneratorstate
+from time import sleep, time
+from typing import Any, Optional
 
-from confluent_kafka import TopicPartition, KafkaException
+from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
-from confluent_kafka.serialization import SerializationContext, MessageField
+from confluent_kafka.serialization import MessageField, SerializationContext
 
 from kafka_mocha.buffer_handler import buffer_handler
-from kafka_mocha.exceptions import KProducerMaxRetryException
+from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
@@ -49,21 +50,19 @@ class KProducer:
     def commit_transaction(self):
         self._done()
 
-    def flush(self, timeout: float = None):
+    def flush(self, timeout: Optional[float] = None):
         """Duck type for confluent_kafka/cimpl.py::flush (see signature there).
 
-        Sends `DONE` signal to message buffer handler in order to force sending buffered messages to Kafka Simulator.
+        Polls the producer (buffer_handler) as long as there are messages in the buffer.
         """
-        count = 0
-        while count < self._max_retry_count:
-            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
-                self._buffer_handler.send(Tick.DONE)
-                break
+        start_buffer_len = len(self.buffer)
+        while (buffer_len := len(self.buffer)) > 0:
+            if timeout is not None:
+                self._run_with_timeout_blocking(self._tick_buffer, timeout=timeout)
             else:
-                count += 1
-                sleep(count**2 * self._retry_backoff)
+                self._tick_buffer()
         else:
-            raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
+            return start_buffer_len - buffer_len
 
     def init_transactions(self):
         self.transaction_inited = True
@@ -78,6 +77,18 @@ class KProducer:
             logger.warning("KProducer doesn't support timing out for this method. Parameter will be ignored.")
 
         return self._kafka_simulator.get_cluster_mdata(topic)
+
+    def poll(self, timeout: Optional[float] = None):
+        """Duck type for confluent_kafka/cimpl.py::poll (see signature there).
+
+        Polls the producer for events and calls the corresponding callbacks (if registered)
+        """
+        start_buffer_len = len(self.buffer)
+        if timeout is not None:
+            self._run_with_timeout_blocking(self._tick_buffer, timeout=timeout)
+        else:
+            self._tick_buffer()
+        return start_buffer_len - len(self.buffer)
 
     def purge(self, *args, **kwargs):
         """Duck type for confluent_kafka/cimpl.py::purge (see signature there).
@@ -118,10 +129,10 @@ class KProducer:
                         on_delivery=on_delivery,
                     )
                 )
-                logger.debug(f"KProducer({id(self)}): received ack: {ack}")
+                logger.debug("KProducer(%d): received ack: %s", id(self), ack)
                 break
             else:
-                logger.debug(f"KProducer({id(self)}): buffer is busy")
+                logger.debug("KProducer(%d): buffer is busy", id(self))
                 count += 1
                 sleep(count**2 * self._retry_backoff)
         else:
@@ -135,14 +146,49 @@ class KProducer:
     def set_sasl_credentials(self, *args, **kwargs):
         pass
 
+    def _tick_buffer(self):
+        """
+        Sends `DONE` signal to message buffer handler in order to force sending buffered messages to Kafka Simulator.
+        """
+        try_count = 0
+        while try_count < self._max_retry_count:
+            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
+                self._buffer_handler.send(Tick.DONE)
+                break
+            else:
+                try_count += 1
+                sleep(try_count**2 * self._retry_backoff)
+        else:
+            raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
+
+    def _timeout_handler(self, signum: Any, frame: Any) -> None:
+        """Handler for SIGALRM signal."""
+        raise KProducerTimeoutException("Timeout exceeded")
+
+    def _run_with_timeout_blocking(self, func, args=(), kwargs={}, timeout: float = 5):
+        """
+        Run function with timeout and block if finished earlier, meaning:
+            - raise TimeoutException if func doesn't end in the time specified
+            - wait (block) if func ends earlier than specified time
+        """
+        signal.signal(signal.SIGALRM, self._timeout_handler)
+        signal.setitimer(signal.ITIMER_REAL, timeout)
+        start_time = time()
+        try:
+            result = func(*args, **kwargs)
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            elapsed_time = time() - start_time
+            remaining_time = timeout - elapsed_time
+            if remaining_time > 0:
+                sleep(remaining_time)
+        return result
+
     def _done(self):
         """Additional method to gracefully close message buffer."""
         self._ticking_thread.stop()
         self._ticking_thread.join()
         self._buffer_handler.close()
 
-
-# producer = KProducer({})
-# producer.produce("topic-1", "key".encode(), "value".encode(), on_delivery=lambda *_: None)
-#
-# producer._done()
+    def __del__(self):
+        self._done()

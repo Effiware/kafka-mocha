@@ -1,9 +1,9 @@
 from abc import ABC
-from dataclasses import dataclass, field, astuple, replace, asdict
+from dataclasses import asdict, astuple, dataclass, field, replace
 from datetime import datetime
 from enum import Enum, auto
 from heapq import heappush
-from typing import Any, Optional, Callable, Literal
+from typing import Any, Callable, Literal, Optional
 
 from confluent_kafka import TIMESTAMP_CREATE_TIME
 

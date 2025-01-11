@@ -23,6 +23,7 @@ confluent-kafka = "^2.6.0"
 pytest = "^8.3.3"
 pytest-env = "^1.1.5"
 moto = "^5.0.24"
+isort = "^5.13.2"
 
 [build-system]
 requires = ["poetry-core"]

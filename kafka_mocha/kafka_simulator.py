@@ -3,11 +3,11 @@ import os
 from threading import Lock
 from typing import Optional
 
-from confluent_kafka.admin import ClusterMetadata, BrokerMetadata, TopicMetadata, PartitionMetadata
+from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
-from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaServerBootstrapException
+from kafka_mocha.exceptions import KafkaServerBootstrapException, KafkaSimulatorBootstrapException
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.models import KTopic, KRecord, PMessage
+from kafka_mocha.models import KRecord, KTopic, PMessage
 from kafka_mocha.signals import KSignals
 
 try:

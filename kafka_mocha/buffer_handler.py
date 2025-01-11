@@ -1,11 +1,11 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Literal, Callable
+from typing import Callable, Literal
 
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
-from kafka_mocha.signals import Tick, KSignals
+from kafka_mocha.signals import KSignals, Tick
 
 logger = get_custom_logger()
 
@@ -62,13 +62,13 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
             new_msg: PMessage | int | float = yield res
             if isinstance(new_msg, int) or isinstance(new_msg, float):
                 if new_msg == Tick.DONE:
-                    logger.info(f"Buffer for {owner}: received done signal, finishing...")
+                    logger.debug("Buffer for %s: received done (or manual flush) signal...", owner)
                     break
                 else:
                     buffer_elapsed_time += new_msg
-                    logger.debug(f"Buffer for {owner}: checking elapsed time: {buffer_elapsed_time}")
+                    logger.debug("Buffer for %s: checking elapsed time: %d", owner, buffer_elapsed_time)
                     if buffer_elapsed_time >= buffer_timeout:
-                        logger.debug(f"Buffer for {owner}: forcing flush due to timeout...")
+                        logger.debug("Buffer for %s: forcing flush due to timeout...", owner)
                         break
             else:
                 new_msg.timestamp = (
@@ -81,10 +81,16 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
                 res = KSignals.BUFFERED
         if buffer:
             res = producer_protocol.send(buffer)
-            logger.info(f"Buffer for {owner}: Kafka response: {res}")
+            logger.info("Buffer for %s: Kafka response: %s", owner, res)
         else:
-            logger.info(f"Buffer for {owner}: nothing to send...")
+            logger.info("Buffer for %s: nothing to send...", owner)
         if res == KSignals.SUCCESS:
-            buffer.clear()
+            try:
+                for msg in buffer:
+                    msg.on_delivery(None, "TODO: add proper message")
+            except Exception as e:
+                logger.error("Buffer for %s: Error while executing callback: %s", owner, e)
+            finally:
+                buffer.clear()
         buffer_elapsed_time = 0
         buffer_loop_no += 1

@@ -1,29 +1,68 @@
-from kafka_mocha.wrappers import mock_producer, MockProducer
-import sys
+import doctest
 from datetime import datetime
 
-# from confluent_kafka import Producer
 import confluent_kafka
-# from confluent_kafka import Producer
+
+from examples.confexmp import handle_produce
+from kafka_mocha.wrappers import mock_producer
+
+TOPIC_NAME = "test-topic"
 
 
+@mock_producer()
+def as_decorated_function():
+    """It can be used as a direct function wrapper.
 
-# @mock_producer
-@MockProducer()
-def main(args):
-    topic = args[1]
-    # producer = Producer({"bootstrap.servers": "localhost:9092"})
+    >>> as_decorated_function()
+    Mock message delivered (decorated function)
+    """
     producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
 
-    while True:
-        try:
-            producer.poll(5.0)
-            producer.produce("test-topic", datetime.now().isoformat(), str(id(producer)))
-            producer.flush()
-            print("Message produced")
-        except KeyboardInterrupt:
-            break
+    # some pre-processing
+    producer.produce(
+        TOPIC_NAME,
+        datetime.now().isoformat(),
+        str(id(producer)),
+        on_delivery=lambda err, msg: print("Mock message delivered (decorated function)"),
+    )
+    producer.flush()
+    # some post-processing
+
+
+def as_context_manager():
+    """It can be used as a context manager.
+
+    >>> as_context_manager()
+    Mock message delivered (context manager)
+    """
+    with mock_producer():
+        producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
+
+        # some pre-processing
+        producer.produce(
+            TOPIC_NAME,
+            datetime.now().isoformat(),
+            str(id(producer)),
+            on_delivery=lambda err, msg: print("Mock message delivered (context manager)"),
+        )
+        producer.flush()
+        # some post-processing
+
+
+@mock_producer()
+def as_class_instance():
+    """It can be used as a class instance wrapper around a function.
+
+    >>> as_class_instance()
+    Message delivered
+    Message delivered
+    Message delivered
+    """
+
+    # some pre-processing
+    handle_produce(TOPIC_NAME)
+    # some post-processing
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    doctest.testmod(verbose=True)

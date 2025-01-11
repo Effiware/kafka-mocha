@@ -8,3 +8,7 @@ class KafkaServerBootstrapException(Exception):
 
 class KProducerMaxRetryException(Exception):
     pass
+
+
+class KProducerTimeoutException(Exception):
+    pass
