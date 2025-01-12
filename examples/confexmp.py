@@ -22,7 +22,7 @@ def handle_produce(topic_name: str):
                 topic_name,
                 datetime.now().isoformat(),
                 str(id(producer)),
-                on_delivery=lambda err, msg: print("Message delivered"),
+                on_delivery=lambda err, msg: print("Inner message delivered"),
             )
             producer.flush()
         except KeyboardInterrupt:

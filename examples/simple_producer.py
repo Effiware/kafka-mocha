@@ -50,13 +50,13 @@ def as_context_manager():
 
 
 @mock_producer()
-def as_class_instance():
-    """It can be used as a class instance wrapper around a function.
+def as_decorated_inner_function():
+    """It can be used as a decorator around an inner function.
 
-    >>> as_class_instance()
-    Message delivered
-    Message delivered
-    Message delivered
+    >>> as_decorated_inner_function()
+    Inner message delivered
+    Inner message delivered
+    Inner message delivered
     """
 
     # some pre-processing

@@ -3,17 +3,13 @@ from unittest.mock import patch
 
 from kafka_mocha.kproducer import KProducer
 
-# def mock_producer(func):
-#     @wraps(func)
-#     def wrapper(*args, **kwargs):
-#         with patch("confluent_kafka.Producer", new=KProducer):
-#             reload(confluent_kafka)
-#             return func(*args, **kwargs)
-#
-#     return wrapper
-
 
 class mock_producer:
+    """Context manager/decorator for mocking confluent_kafka.Producer.
+
+    TODO: More detailed description will be added in the future.
+    """
+
     def __init__(self):
         self._patcher = patch("confluent_kafka.Producer", new=KProducer)
 
@@ -21,7 +17,7 @@ class mock_producer:
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            with self._patcher as foo:
+            with self._patcher:
                 return func(*args, **kwargs)
 
         return wrapper

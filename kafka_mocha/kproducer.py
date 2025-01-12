@@ -161,8 +161,9 @@ class KProducer:
         else:
             raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
 
-    def _timeout_handler(self, signum: Any, frame: Any) -> None:
-        """Handler for SIGALRM signal."""
+    @staticmethod
+    def _timeout_handler(signum: Any, frame: Any) -> None:
+        """Handler for SIGALRM signal. Must be a staticmethod (otherwise GC may not collect it)."""
         raise KProducerTimeoutException("Timeout exceeded")
 
     def _run_with_timeout_blocking(self, func, args=(), kwargs={}, timeout: float = 5):
