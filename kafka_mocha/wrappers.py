@@ -1,4 +1,5 @@
-from functools import wraps
+from functools import wraps, partial
+from typing import Literal, Optional
 from unittest.mock import patch
 
 from kafka_mocha.kproducer import KProducer
@@ -10,8 +11,12 @@ class mock_producer:
     TODO: More detailed description will be added in the future.
     """
 
-    def __init__(self):
-        self._patcher = patch("confluent_kafka.Producer", new=KProducer)
+    def __init__(self, loglevel: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = None):
+        self._patcher = (
+            patch("confluent_kafka.Producer", new=partial(KProducer, loglevel=loglevel))
+            if loglevel
+            else patch("confluent_kafka.Producer", new=KProducer)
+        )
 
     def __call__(self, func):
 

@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 
 def get_filter(strategy: Literal["all", "kafka-only"]) -> Callable[[Any], bool]:
+    """Factory function for creating log record filters."""
     match strategy:
         case "all":
 
@@ -20,14 +21,19 @@ def get_filter(strategy: Literal["all", "kafka-only"]) -> Callable[[Any], bool]:
     return _filter
 
 
-def get_custom_logger(name="kafka_mocha"):
+def get_custom_logger(
+    loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR", name="kafka_mocha"
+) -> logging.Logger:
+    """Initializes (if not already done) and returns a custom logger."""
     logger = logging.getLogger(name)
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(logging.Formatter("(levelname)-8s %(module)-15s > %(message)s"))
 
     if not logger.hasHandlers():
         logger.addHandler(stream_handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.getLevelName(loglevel))
         logger.addFilter(get_filter("all"))
+    elif logger.level != logging.getLevelName(loglevel):
+        logger.setLevel(logging.getLevelName(loglevel))
 
     return logger

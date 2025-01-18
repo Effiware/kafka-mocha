@@ -1,7 +1,7 @@
 import signal
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
@@ -15,12 +15,13 @@ from kafka_mocha.models import PMessage
 from kafka_mocha.signals import KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
 
-logger = get_custom_logger()
-
 
 class KProducer:
-    def __init__(self, config: dict[str, Any]):
+    def __init__(
+        self, config: dict[str, Any], loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR"
+    ):
         self.config = dict(config)
+        self.logger = get_custom_logger(loglevel)
         self.buffer = []
         self._key_serializer = self.config.pop("key.serializer", None)
         self._value_serializer = self.config.pop("value.serializer", None)
@@ -66,7 +67,7 @@ class KProducer:
 
     def init_transactions(self):
         self.transaction_inited = True
-        logger.warning("KProducer doesn't support transactions (yet). Skipping...")
+        self.logger.warning("KProducer doesn't support transactions (yet). Skipping...")
 
     def list_topics(self, topic: str = None, timeout: float = -1.0, *args, **kwargs):
         """Duck type for confluent_kafka/cimpl.py::list_topics (see signature there).
@@ -74,7 +75,7 @@ class KProducer:
         Returns ClusterMetadata object from Kafka Simulator.
         """
         if timeout != -1.0:
-            logger.warning("KProducer doesn't support timing out for this method. Parameter will be ignored.")
+            self.logger.warning("KProducer doesn't support timing out for this method. Parameter will be ignored.")
 
         return self._kafka_simulator.get_cluster_mdata(topic)
 
@@ -129,10 +130,10 @@ class KProducer:
                         on_delivery=on_delivery,
                     )
                 )
-                logger.debug("KProducer(%d): received ack: %s", id(self), ack)
+                self.logger.debug("KProducer(%d): received ack: %s", id(self), ack)
                 break
             else:
-                logger.debug("KProducer(%d): buffer is busy", id(self))
+                self.logger.debug("KProducer(%d): buffer is busy", id(self))
                 count += 1
                 sleep(count**2 * self._retry_backoff)
         else:

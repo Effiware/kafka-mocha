@@ -9,7 +9,7 @@ from kafka_mocha.wrappers import mock_producer
 TOPIC_NAME = "test-topic"
 
 
-@mock_producer()
+@mock_producer(loglevel="DEBUG")
 def as_decorated_function():
     """It can be used as a direct function wrapper.
 

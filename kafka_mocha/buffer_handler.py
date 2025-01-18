@@ -66,7 +66,7 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
                     break
                 else:
                     buffer_elapsed_time += new_msg
-                    logger.debug("Buffer for %s: checking elapsed time: %d", owner, buffer_elapsed_time)
+                    logger.debug("Buffer for %s: checking elapsed time: %.3fs", owner, buffer_elapsed_time)
                     if buffer_elapsed_time >= buffer_timeout:
                         logger.debug("Buffer for %s: forcing flush due to timeout...", owner)
                         break

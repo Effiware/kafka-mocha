@@ -23,7 +23,7 @@ class TickingThread(Thread):
 
         while not self._stop_event.is_set():
             if getgeneratorstate(self._message_buffer) == GEN_SUSPENDED:
-                logger.debug("Buffer for %s: tick (+%d)...", self._owner, self._tick.interval)
+                logger.debug("Buffer for %s: tick (+%.3fs)...", self._owner, self._tick.interval)
                 self._message_buffer.send(self._tick.interval)
             sleep(self._tick.interval)
         sleep(self._tick.interval * 3)  # TODO: make it better
