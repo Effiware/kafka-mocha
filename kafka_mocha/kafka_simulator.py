@@ -1,13 +1,14 @@
 import json
 import os
 from threading import Lock
-from typing import Optional
+from typing import Literal, Optional
 
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
 from kafka_mocha.exceptions import KafkaServerBootstrapException, KafkaSimulatorBootstrapException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import KRecord, KTopic, PMessage
+from kafka_mocha.renderers import render
 from kafka_mocha.signals import KSignals
 
 try:
@@ -141,3 +142,12 @@ class KafkaSimulator:
     #             self.handle_producers()
     #         except StopIteration:
     #             print("[KAFKA] Producers handled")
+
+    def render_records(self, output: Literal["html", "csv"]):
+        if output:
+            render(output, self.topics)
+        else:
+            logger.error("No output format has been set. Rendering skipped.")
+
+    def __del__(self):
+        logger.debug("Kafka Simulator has been terminated.")

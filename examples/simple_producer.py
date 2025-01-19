@@ -4,14 +4,14 @@ from datetime import datetime
 import confluent_kafka
 
 from examples.confexmp import handle_produce
-from kafka_mocha.wrappers import mock_producer
+from kafka_mocha import mock_producer
 
 TOPIC_NAME = "test-topic"
 
 
 @mock_producer(loglevel="DEBUG")
 def as_decorated_function():
-    """It can be used as a direct function wrapper.
+    """It can be used as a direct function wrapper. Explicitly set loglevel to DEBUG.
 
     >>> as_decorated_function()
     Mock message delivered (decorated function)
@@ -49,9 +49,9 @@ def as_context_manager():
         # some post-processing
 
 
-@mock_producer()
+@mock_producer(output="html")
 def as_decorated_inner_function():
-    """It can be used as a decorator around an inner function.
+    """It can be used as a decorator around an inner function. Explicitly set output to HTML.
 
     >>> as_decorated_inner_function()
     Inner message delivered

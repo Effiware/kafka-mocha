@@ -1,7 +1,7 @@
 import signal
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Optional, Literal
+from typing import Any, Literal, Optional
 
 from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
@@ -18,9 +18,13 @@ from kafka_mocha.ticking_thread import TickingThread
 
 class KProducer:
     def __init__(
-        self, config: dict[str, Any], loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR"
+        self,
+        config: dict[str, Any],
+        output: Optional[Literal["html", "csv"]] = None,
+        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR",
     ):
         self.config = dict(config)
+        self.output = output
         self.logger = get_custom_logger(loglevel)
         self.buffer = []
         self._key_serializer = self.config.pop("key.serializer", None)
@@ -194,3 +198,5 @@ class KProducer:
 
     def __del__(self):
         self._done()
+        if self.output:
+            self._kafka_simulator.render_records(self.output)
