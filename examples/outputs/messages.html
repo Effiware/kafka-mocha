@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="timestamp" content="2025-01-19T19:35:03.126792+00:00">
+    <meta name="os" content="Darwin">
+    <title>kafka_mocha</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #1a202c; /* bg-gray-900 */
+            color: #e2e8f0; /* text-gray-300 */
+        }
+        .container {
+            flex: 1;
+            width: 90%;
+            margin: auto;
+        }
+        .search-bar {
+            margin-bottom: 20px;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #4a5568; /* border-gray-600 */
+            padding: 8px;
+        }
+        th {
+            background-color: #2d3748; /* bg-gray-700 */
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .pagination button {
+            margin: 0 5px;
+            padding: 5px 10px;
+            background-color: #ecc94b; /* bg-yellow-500 */
+            color: #0c4a6e; /* text-sky-800 */
+            border: none;
+            cursor: pointer;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        .pagination button:hover {
+            background-color: #f6e05e; /* hover:bg-yellow-400 */
+        }
+        .footer {
+            text-align: center;
+            padding: 10px 0;
+            background-color: #2d3748; /* bg-gray-700 */
+        }
+        .footer img {
+            height: 20px;
+            vertical-align: middle;
+        }
+        .footer a {
+            margin: 0 10px;
+            color: #ecc94b; /* text-yellow-500 */
+        }
+        .dropdown {
+            margin-bottom: 20px;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px;
+            cursor: pointer;
+            background-color: #2d3748; /* bg-gray-700 */
+            margin-right: 5px;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        .tab.active {
+            background-color: #ecc94b; /* bg-yellow-500 */
+            color: #0c4a6e; /* text-sky-800 */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Embedded Kafka output</h1>
+        <div class="tabs" id="tabs">
+            
+            <div class="tab" onclick="showTopic('_schemas')">_schemas</div>
+            
+            <div class="tab" onclick="showTopic('__consumer_offsets')">__consumer_offsets</div>
+            
+            <div class="tab" onclick="showTopic('test-topic')">test-topic</div>
+            
+        </div>
+        <div class="search-bar">
+            <span class="search-bar">
+                <input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search for messages..">
+            </span>
+            <span class="dropdown">
+                <label for="rowsPerPage">Messages per page:</label>
+                <select id="rowsPerPage" onchange="changeRowsPerPage()">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </span>
+        </div>
+        <div class="table-container">
+            
+            <table id="table-_schemas" class="messagesTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Partition</th>
+                        <th>Offset</th>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th>Headers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+            
+            <table id="table-__consumer_offsets" class="messagesTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Partition</th>
+                        <th>Offset</th>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th>Headers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+            
+            <table id="table-test-topic" class="messagesTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Partition</th>
+                        <th>Offset</th>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th>Headers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr>
+                        <td></td>
+                        <td>0</td>
+                        <td>1000</td>
+                        <td>b'4401117520'</td>
+                        <td>b'2025-01-19T20:34:56.758061'</td>
+                        <td>()</td>
+                    </tr>
+                    
+                    <tr>
+                        <td></td>
+                        <td>0</td>
+                        <td>1001</td>
+                        <td>b'4401117520'</td>
+                        <td>b'2025-01-19T20:34:59.762262'</td>
+                        <td>()</td>
+                    </tr>
+                    
+                    <tr>
+                        <td></td>
+                        <td>0</td>
+                        <td>1002</td>
+                        <td>b'4401117520'</td>
+                        <td>b'2025-01-19T20:35:02.769633'</td>
+                        <td>()</td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+            
+        </div>
+        <div class="pagination">
+            <button onmouseover="hoverButton(this)" onmouseout="unhoverButton(this)" onclick="prevPage()">Previous</button>
+            <button onmouseover="hoverButton(this)" onmouseout="unhoverButton(this)" onclick="nextPage()">Next</button>
+        </div>
+    </div>
+    <footer class="footer">
+        <p>
+
+            <a href="https://effiware.com">Effiware</a>
+            <a href="https://github.com/Effiware/kafka-mocha">GitHub</a>
+            <a href="https://pypi.org/project/kafka-mocha/">PyPi</a>
+            <a href="https://buymeacoffee.com/effiware">Support</a>
+        </p>
+    </footer>
+    <script>
+        var currentPage = 1;
+        var rowsPerPage = 10;
+        var currentTopic = "_schemas";
+
+        function displayTablePage(page) {
+            var table, tr, i;
+            table = document.getElementById("table-" + currentTopic);
+            tr = table.getElementsByTagName("tr");
+            for (i = 1; i < tr.length; i++) {
+                tr[i].style.display = "none";
+            }
+            for (i = (page - 1) * rowsPerPage + 1; i <= page * rowsPerPage && i < tr.length; i++) {
+                tr[i].style.display = "";
+            }
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                displayTablePage(currentPage);
+            }
+        }
+
+        function nextPage() {
+            var table, tr;
+            table = document.getElementById("table-" + currentTopic);
+            tr = table.getElementsByTagName("tr");
+            if (currentPage * rowsPerPage < tr.length - 1) {
+                currentPage++;
+                displayTablePage(currentPage);
+            }
+        }
+
+        function searchTable() {
+            var input, filter, table, tr, td, i, j, txtValue;
+            input = document.getElementById("searchInput");
+            filter = input.value.toLowerCase();
+            table = document.getElementById("table-" + currentTopic);
+            tr = table.getElementsByTagName("tr");
+            for (i = 1; i < tr.length; i++) {
+                tr[i].style.display = "none";
+                td = tr[i].getElementsByTagName("td");
+                for (j = 0; j < td.length; j++) {
+                    if (td[j]) {
+                        txtValue = td[j].textContent || td[j].innerText;
+                        if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                            tr[i].style.display = "";
+                            break;
+                        }
+                    }
+                }
+            }
+            currentPage = 1;
+            displayTablePage(currentPage);
+        }
+
+        function changeRowsPerPage() {
+            var select = document.getElementById("rowsPerPage");
+            rowsPerPage = parseInt(select.value);
+            currentPage = 1;
+            displayTablePage(currentPage);
+        }
+
+        function hoverButton(button) {
+            button.style.backgroundColor = "#f6e05e"; /* hover:bg-yellow-400 */
+        }
+
+        function unhoverButton(button) {
+            button.style.backgroundColor = "#ecc94b"; /* bg-yellow-500 */
+        }
+
+        function showTopic(topic) {
+            currentTopic = topic;
+            var tables = document.getElementsByClassName("messagesTable");
+            for (var i = 0; i < tables.length; i++) {
+                tables[i].style.display = "none";
+            }
+            document.getElementById("table-" + topic).style.display = "table";
+            var tabs = document.getElementsByClassName("tab");
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove("active");
+            }
+            event.target.classList.add("active");
+            currentPage = 1;
+            displayTablePage(currentPage);
+        }
+
+        window.onload = function() {
+            showTopic(currentTopic);
+        };
+    </script>
+</body>
+</html>

@@ -149,7 +149,7 @@ class KProducer:
         raise NotImplementedError("Transactions are not yet fully supported in Kafka Mocha.")
 
     def set_sasl_credentials(self, *args, **kwargs):
-        pass
+        raise NotImplementedError("Not yet implemented...")
 
     def _tick_buffer(self):
         """

@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from kafka_mocha.models import KHeader, KRecord, KTopic, KPartition, PMessage
+from kafka_mocha.models import KHeader, KPartition, KRecord, KTopic, PMessage
 
 
 def test_kheader_creation() -> None:

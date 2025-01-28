@@ -24,6 +24,16 @@ logger = get_custom_logger()
 
 
 class KafkaSimulator:
+    """Kafka Simulator (singleton) class that acts as a mock Kafka Broker.
+
+    It fully replicates the Kafka Broker's behavior and provides a way to simulate Kafka's behavior in a controlled
+    environment. It is a singleton class that can be accessed from anywhere in the codebase.
+    As a rule of thumb, it shouldn't be instantiated or used directly. Instead, it's internally used by the KProducer
+    and KConsumer classes and can be manipulated by:
+    - environment variables prefixed with `KAFKA_MOCHA_KSIM` (e.g. KAFKA_MOCHA_KSIM_ONE_ACK_DELAY, see README.md)
+    - wrapper function parameters (e.g. mock_producer, mock_consumer, either as a decorator or context manager)
+    """
+
     _instance = None
     _lock = Lock()
     _is_running = False
@@ -48,6 +58,7 @@ class KafkaSimulator:
         """Converts KTopics into ClusterMetadata (stubbed)."""
 
         def _t_metadata_factory(_topic: KTopic) -> TopicMetadata:
+            """Converts KTopic into TopicMetadata."""
             partitions = dict()
             for idx, _ in enumerate(_topic.partitions):
                 p_metadata = PartitionMetadata()
@@ -79,6 +90,7 @@ class KafkaSimulator:
         return c_metadata
 
     def get_cluster_mdata(self, topic_name: str = None) -> ClusterMetadata:
+        """Returns ClusterMetadata object from Kafka Simulator (acts as if it was real Kafka Broker)."""
         if topic_name is None:
             return self._topics_2_cluster_metadata()
 
@@ -93,6 +105,10 @@ class KafkaSimulator:
             return self._topics_2_cluster_metadata([])
 
     def handle_producers(self):
+        """A separate generator function that yields a signal to the caller. Handles incoming messages from producers.
+
+        :note: Separate/common event-loop-like for handling producers/consumers are being tested.
+        """
         logger.info("Handle producers has been primed")
         last_received_msg_ts = -1.0
         while True:
@@ -127,6 +143,10 @@ class KafkaSimulator:
                     logger.debug(f"Appended message: {k_record}")
 
     def handle_consumers(self):
+        """A separate generator function that yields a signal to the caller. Handles delivering messages to consumer.
+
+        :note: Separate/common event-loop-like for handling producers/consumers are being tested.
+        """
         while True:
             yield
 
@@ -144,6 +164,7 @@ class KafkaSimulator:
     #             print("[KAFKA] Producers handled")
 
     def render_records(self, output: Literal["html", "csv"]):
+        """Renders Kafka records in the specified format."""
         if output:
             render(output, self.topics)
         else:

@@ -3,8 +3,8 @@ from time import sleep
 
 from confluent_kafka import TIMESTAMP_CREATE_TIME
 
-from kafka_mocha.models import KTopic, KRecord
-from kafka_mocha.renderers import render_html, render_csv
+from kafka_mocha.models import KRecord, KTopic
+from kafka_mocha.renderers import render_csv, render_html
 
 
 def test_render_html() -> None:
@@ -16,7 +16,16 @@ def test_render_html() -> None:
         for t in [topic_1, topic_2]:
             for p_idx, p in enumerate(t.partitions):
                 individual = i + _range * p_idx
-                p.append(KRecord(topic=t.name, partition=individual % t.partition_no, offset=individual // t.partition_no, key=f"key_{individual}".encode(), value=f"value_{individual}".encode(), timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000))))
+                p.append(
+                    KRecord(
+                        topic=t.name,
+                        partition=individual % t.partition_no,
+                        offset=individual // t.partition_no,
+                        key=f"key_{individual}".encode(),
+                        value=f"value_{individual}".encode(),
+                        timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000)),
+                    )
+                )
                 sleep(0.01)
 
     for t in [topic_1, topic_2]:
@@ -35,7 +44,16 @@ def test_render_csv() -> None:
         for t in [topic_1, topic_2]:
             for p_idx, p in enumerate(t.partitions):
                 individual = i + _range * p_idx
-                p.append(KRecord(topic=t.name, partition=individual % t.partition_no, offset=individual // t.partition_no, key=f"key_{individual}".encode(), value=f"value_{individual}".encode(), timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000))))
+                p.append(
+                    KRecord(
+                        topic=t.name,
+                        partition=individual % t.partition_no,
+                        offset=individual // t.partition_no,
+                        key=f"key_{individual}".encode(),
+                        value=f"value_{individual}".encode(),
+                        timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000)),
+                    )
+                )
                 sleep(0.1)
 
     for t in [topic_1, topic_2]:

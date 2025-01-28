@@ -6,6 +6,10 @@ class KafkaServerBootstrapException(Exception):
     pass
 
 
+class KafkaClientBootstrapException(Exception):
+    pass
+
+
 class KProducerMaxRetryException(Exception):
     pass
 

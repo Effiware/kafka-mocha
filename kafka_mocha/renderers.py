@@ -38,9 +38,9 @@ def render_csv(topics: list[KTopic], output_name: str = "messages.csv") -> None:
     template = environment.get_template("messages.csv.jinja")
     topic_records = _prepare_records(topics)
     content = template.render(topics=topic_records)
-    content = "\n".join(
-        [line.replace("# Topic:", "\n# Topic:") for line in content.split("\n") if line.strip() != ""]
-    )[1:]
+    content = "\n".join([line.replace("# Topic:", "\n# Topic:") for line in content.split("\n") if line.strip() != ""])[
+        1:
+    ]
 
     with open(output_name, mode="w", encoding="utf-8") as output:
         output.write(content)
