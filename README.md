@@ -1,7 +1,23 @@
 # Embedded Kafka (Kafka Simulator) for Python
 
-Embedded Kafka is a mocking library for the `confluent_kafka` library used for Apache Kafka. This library allows integration tests 
-to utilize `Producer` and `Consumer` instances without an actual connection to a Kafka Cluster. 
+[![PyPI](https://img.shields.io/pypi/v/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - License](https://img.shields.io/pypi/l/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Status](https://img.shields.io/pypi/status/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Wheel](https://img.shields.io/pypi/wheel/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Implementation](https://img.shields.io/pypi/implementation/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+
+Embedded Kafka is a mocking library for the `confluent_kafka` library used for Apache Kafka. Its goal is to ease the effort 
+of writing integration tests that utilize `Producer` and/or `Consumer` instances. Of course, you can always span your own
+Kafka Cluster just for testing purposes, but it is not always the best solution.
+
+With **kafka_mocha** you no longer need to have a Kafka Cluster running to test your Kafka-related code. Instead, you can use the `KProducer`
+and `KConsumer` (by simply decorating your code with `@mock_producer`/`@mock_consumer`) and check the behavior of your code - or even
+the messages that are being produced and consumed in the browser!
+
+Inspiration for this project comes from the [moto](https://pypi.org/project/moto/) library, which provides a similar feature for AWS SDK.
+
 
 ## Project Overview
 
@@ -98,11 +114,11 @@ The `KProducer` class replicates the interface and behavior of the `Producer` cl
 <details>
 <summary>Parameters for mock_producer</summary>
 
-| No | Parameter name | Parameter type | Comment                                   |
-|----|----------------|----------------|-------------------------------------------|
-| 1  | loglevel       | Literal        | See available levels in `logging` library |
-| 2  |                |                |                                           |
-| 3  |                |                |                                           |
+| No | Parameter name | Parameter type | Comment                                              |
+|----|----------------|----------------|------------------------------------------------------|
+| 1  | loglevel       | Literal        | See available levels in `logging` library            |
+| 2  | output         | Literal        | HTML, CSV or INT - output format of messages emitted |
+| 3  |                |                |                                                      |
 
 </details>
 

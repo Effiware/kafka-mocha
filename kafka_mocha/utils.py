@@ -117,6 +117,33 @@ consumer_config_schema = {
 }
 
 
+def _validate_against_schema(schema: dict[str, dict[str, Any]], config: dict[str, Any]) -> None:
+    """Validates configuration against given schema."""
+    errors = []
+    for key, value in config.items():
+        if key not in schema:
+            errors.append(f"Unknown configuration parameter: {key}")
+            continue
+
+        expected_type = schema[key]["type"]
+        if not isinstance(value, expected_type):
+            errors.append(f"Invalid type for {key}: expected {expected_type.__name__}, got {type(value).__name__}")
+            continue
+
+        allowed_range = schema[key].get("range")
+        if allowed_range and not (allowed_range[0] <= value <= allowed_range[1]):
+            errors.append(f"Value out of range for {key}: expected {allowed_range}, got {value}")
+            continue
+
+        allowed_values = schema[key].get("allowed")
+        if allowed_values and value not in allowed_values:
+            errors.append(f"Invalid value for {key}: expected one of {allowed_values}, got {value}")
+            continue
+
+    if errors:
+        raise KafkaClientBootstrapException("Configuration validation errors: " + "; ".join(errors))
+
+
 def validate_common_config(config: dict[str, Any]) -> None:
     """Validates common (C/P = *) configuration options for KafkaProducer and KafkaConsumer.
 
@@ -127,94 +154,33 @@ def validate_common_config(config: dict[str, Any]) -> None:
     if "bootstrap.servers" not in config:
         raise KafkaClientBootstrapException("Configuration validation errors: bootstrap.servers is required")
 
-    errors = []
-    for key, value in config.items():
-        if key not in common_config_schema:
-            errors.append(f"Unknown configuration parameter: {key}")
-            continue
-
-        expected_type = common_config_schema[key]["type"]
-        if not isinstance(value, expected_type):
-            errors.append(f"Invalid type for {key}: expected {expected_type.__name__}, got {type(value).__name__}")
-            continue
-
-        allowed_range = common_config_schema[key].get("range")
-        if allowed_range and not (allowed_range[0] <= value <= allowed_range[1]):
-            errors.append(f"Value out of range for {key}: expected {allowed_range}, got {value}")
-            continue
-
-        allowed_values = common_config_schema[key].get("allowed")
-        if allowed_values and value not in allowed_values:
-            errors.append(f"Invalid value for {key}: expected one of {allowed_values}, got {value}")
-            continue
-
-    if errors:
-        raise KafkaClientBootstrapException("Configuration validation errors: " + "; ".join(errors))
+    _validate_against_schema(common_config_schema, config)
 
 
-def validate_producer_config(config):
+def validate_producer_config(config) -> None:
     """Validates producer's (C/P = P) configuration options for KafkaProducer.
 
     :param config: Configuration dictionary
     :raises KafkaClientBootstrapException: If configuration is invalid
     """
 
-    errors = []
-    for key, value in config.items():
-        if key not in producer_config_schema:
-            errors.append(f"Unknown configuration parameter: {key}")
-            continue
-
-        expected_type = producer_config_schema[key]["type"]
-        if not isinstance(value, expected_type):
-            errors.append(f"Invalid type for {key}: expected {expected_type.__name__}, got {type(value).__name__}")
-            continue
-
-        allowed_range = producer_config_schema[key].get("range")
-        if allowed_range and not (allowed_range[0] <= value <= allowed_range[1]):
-            errors.append(f"Value out of range for {key}: expected {allowed_range}, got {value}")
-            continue
-
-        allowed_values = producer_config_schema[key].get("allowed")
-        if allowed_values and value not in allowed_values:
-            errors.append(f"Invalid value for {key}: expected one of {allowed_values}, got {value}")
-            continue
-
-    if errors:
-        raise KafkaClientBootstrapException("Configuration validation errors: " + "; ".join(errors))
+    _validate_against_schema(producer_config_schema, config)
 
 
-def validate_consumer_config(config):
-    # Configuration schema for consumer (C/P = C) properties
+def validate_consumer_config(config) -> None:
+    """Validates producer's (C/P = C) configuration options for KafkaProducer.
 
-    errors = []
+    :param config: Configuration dictionary
+    :raises KafkaClientBootstrapException: If configuration is invalid
+    """
 
-    for key, value in config.items():
-        if key not in consumer_config_schema:
-            errors.append(f"Unknown configuration parameter: {key}")
-            continue
-
-        expected_type = consumer_config_schema[key]["type"]
-        if not isinstance(value, expected_type):
-            errors.append(f"Invalid type for {key}: expected {expected_type.__name__}, got {type(value).__name__}")
-            continue
-
-        allowed_range = consumer_config_schema[key].get("range")
-        if allowed_range and not (allowed_range[0] <= value <= allowed_range[1]):
-            errors.append(f"Value out of range for {key}: expected {allowed_range}, got {value}")
-            continue
-
-        allowed_values = consumer_config_schema[key].get("allowed")
-        if allowed_values and value not in allowed_values:
-            errors.append(f"Invalid value for {key}: expected one of {allowed_values}, got {value}")
-            continue
-
-    if errors:
-        raise KafkaClientBootstrapException("Configuration validation errors: " + "; ".join(errors))
+    _validate_against_schema(consumer_config_schema, config)
 
 
 def validate_config(config_type: Literal["common", "producer", "consumer"], config: dict[str, Any]) -> None:
-    """Validates configuration options for KafkaProducer and KafkaConsumer.
+    """
+    Validates configuration options for KafkaProducer and KafkaConsumer. Each configuration type has its own schema
+    and each key in the configuration dictionary MUST belong to a valid schema.
 
     :param config_type: Configuration type
     :param config: Configuration dictionary
@@ -225,11 +191,21 @@ def validate_config(config_type: Literal["common", "producer", "consumer"], conf
         validate_common_config(config)
     elif config_type == "producer":
         producer_only_config = {**config}
+        rest_config = {}
+
         for key in common_config_schema.keys():
-            producer_only_config.pop(key, None)
+            value = producer_only_config.pop(key, None)
+            if value is not None:
+                rest_config[key] = value
         validate_producer_config(producer_only_config)
+        validate_common_config(rest_config)
     else:
         consumer_only_config = {**config}
+        rest_config = {}
+
         for key in common_config_schema.keys():
-            consumer_only_config.pop(key, None)
+            value = consumer_only_config.pop(key, None)
+            if value is not None:
+                rest_config[key] = value
         validate_consumer_config(consumer_only_config)
+        validate_common_config(rest_config)

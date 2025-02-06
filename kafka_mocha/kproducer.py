@@ -7,6 +7,7 @@ from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
 from confluent_kafka.serialization import MessageField, SerializationContext
 
+from kafka_mocha.utils import validate_config
 from kafka_mocha.buffer_handler import buffer_handler
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
 from kafka_mocha.kafka_simulator import KafkaSimulator
@@ -23,7 +24,8 @@ class KProducer:
         output: Optional[Literal["html", "csv"]] = None,
         loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR",
     ):
-        self.config = dict(config)
+        validate_config("producer", config)
+        self.config = config
         self.output = output
         self.logger = get_custom_logger(loglevel)
         self.buffer = []
@@ -197,6 +199,7 @@ class KProducer:
         self._buffer_handler.close()
 
     def __del__(self):
-        self._done()
-        if self.output:
-            self._kafka_simulator.render_records(self.output)
+        if hasattr(self, "config"):  # if __init__ was called without exceptions
+            self._done()
+            if self.output:
+                self._kafka_simulator.render_records(self.output)

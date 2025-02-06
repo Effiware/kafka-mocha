@@ -28,6 +28,7 @@ valid_common_string_fields = {
 
 
 def valid_config_factory(config_type: Literal["common", "producer", "consumer"]) -> list[tuple[str, Any]]:
+    """Factory function for generating valid configuration parameters for given client type."""
     if config_type == "common":
         schema = common_config_schema
     elif config_type == "producer":
@@ -52,6 +53,7 @@ def valid_config_factory(config_type: Literal["common", "producer", "consumer"])
 
 
 def invalid_config_factory(config_type: Literal["common", "producer", "consumer"]) -> list[tuple[str, Any]]:
+    """Factory function for generating invalid configuration parameters for given client type."""
     if config_type == "common":
         schema = common_config_schema
     elif config_type == "producer":
@@ -88,6 +90,15 @@ def test_validate_common_config_unhappy_path(key: str, value: Any) -> None:
     """Test validate_common_config with invalid configuration parameters."""
 
     config = {"bootstrap.servers": "localhost:9092", key: value} if key != "bootstrap.servers" else {key: value}
+    with pytest.raises(KafkaClientBootstrapException):
+        validate_common_config(config)
+
+
+def test_validate_common_config_required_fields() -> None:
+    """Test validate_common_config with missing required configuration parameters."""
+
+    config = {**valid_common_string_fields}
+    del config["bootstrap.servers"]
     with pytest.raises(KafkaClientBootstrapException):
         validate_common_config(config)
 
