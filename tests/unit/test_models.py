@@ -92,7 +92,7 @@ def test_appending_to_kpartition_() -> None:
     assert len(partition._heap) == 4
     for existing, inserted in zip([rec1, rec2, rec3, rec4], partition._heap):
         assert existing.partition == inserted[1]
-        assert existing.offset == inserted[7]
+        assert existing.offset == inserted[8]
         assert existing.key == inserted[2]
         assert existing.value == inserted[3]
         for idx, header in enumerate(existing.headers):

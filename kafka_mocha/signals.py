@@ -18,3 +18,11 @@ class KSignals(Enum):
 
     def __str__(self) -> str:
         return str(self.value)
+
+
+class KMarkers(Enum):
+    COMMIT = "COMMIT"
+    ABORT = "ABORT"
+
+    def __str__(self) -> str:
+        return str(self.value)

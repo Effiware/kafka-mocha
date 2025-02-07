@@ -62,8 +62,6 @@ producer_config_schema = {
     "linger.ms": {"type": int, "range": (0, 900000)},
     "message.send.max.retries": {"type": int, "range": (0, 2147483647)},
     "retries": {"type": int, "range": (0, 2147483647)},
-    "retry.backoff.ms": {"type": int, "range": (1, 300000)},
-    "retry.backoff.max.ms": {"type": int, "range": (1, 300000)},
     "queue.buffering.backpressure.threshold": {"type": int, "range": (1, 1000000)},
     "compression.codec": {"type": str, "allowed": ["none", "gzip", "snappy", "lz4", "zstd"]},
     "compression.type": {"type": str, "allowed": ["none", "gzip", "snappy", "lz4", "zstd"]},

@@ -117,7 +117,7 @@ The `KProducer` class replicates the interface and behavior of the `Producer` cl
 | No | Parameter name | Parameter type | Comment                                              |
 |----|----------------|----------------|------------------------------------------------------|
 | 1  | loglevel       | Literal        | See available levels in `logging` library            |
-| 2  | output         | Literal        | HTML, CSV or INT - output format of messages emitted |
+| 2  | output         | Literal        | html, csv or int - output format of messages emitted |
 | 3  |                |                |                                                      |
 
 </details>

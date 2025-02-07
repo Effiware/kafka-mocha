@@ -42,6 +42,8 @@ class KafkaSimulator:
     _lock = Lock()
     _is_running = False
 
+    producers_handler = None
+
     def __new__(cls):
         if not cls._instance:
             with cls._lock:
@@ -56,6 +58,9 @@ class KafkaSimulator:
         self.topics.append(KTopic("_schemas"))  #  Built-in `_schemas` topic
         self.topics.append(KTopic("__consumer_offsets"))  #  Built-in `__consumer_offsets` topic
         self._registered_transact_ids: dict[str, list[int]] = defaultdict(list)  # Producer's epoch = list length
+
+        self.producers_handler = self.handle_producers()
+        self.producers_handler.send(KSignals.INIT.value)
 
         logger.info(f"Kafka Simulator initialized")
         logger.debug(f"Registered topics: {self.topics}")
@@ -123,14 +128,14 @@ class KafkaSimulator:
         self, state: Literal["init", "begin", "commit", "abort"], producer_id: int, transactional_id: str
     ):
         """Transaction coordinator that handles transaction(s) flow."""
-        handler = self.handle_producers()
+        handler = self.producers_handler
         if getgeneratorstate(handler) != GEN_SUSPENDED:
             raise KafkaSimulatorProcessingException(
-                "Potential bug: producers handler should be suspended at this point..."
+                f"Potential bug: producers handler should be suspended at this point... {getgeneratorstate(handler)}"
             )
 
         producer_epoch = len(self._registered_transact_ids[transactional_id]) - 1
-        msg_partition = hash(transactional_id) % self.TRANSACT_TOPIC_PARTITION_NO
+        msg_partition = abs(hash(transactional_id)) % self.TRANSACT_TOPIC_PARTITION_NO
         msg_key = {"transactionalId": transactional_id, "version": 0}
         msg_value = {
             "transactionalId": transactional_id,
@@ -148,6 +153,7 @@ class KafkaSimulator:
         match state:
             case "init":
                 self.register_producer_transaction_id(producer_id, transactional_id)
+                msg_value["producerEpoch"] = len(self._registered_transact_ids[transactional_id]) - 1
                 msg_value["state"] = "Empty"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
             case "begin":
@@ -161,7 +167,8 @@ class KafkaSimulator:
                     PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())
                 )
             case "abort":
-                msgs = []
+                msg_value["state"] = "Abort"
+                msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
             case _:
                 raise ValueError(f"Invalid transaction state: {state}")
 

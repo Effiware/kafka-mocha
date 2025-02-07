@@ -12,7 +12,7 @@ from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutE
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
-from kafka_mocha.signals import KSignals, Tick
+from kafka_mocha.signals import KSignals, Tick, KMarkers
 from kafka_mocha.ticking_thread import TickingThread
 from kafka_mocha.utils import validate_config
 
@@ -28,22 +28,27 @@ class KProducer:
         self.config = config
         self.output = output
         self.logger = get_custom_logger(loglevel)
-        self.buffer = []
-        self._key_serializer = self.config.pop("key.serializer", None)
-        self._value_serializer = self.config.pop("value.serializer", None)
-        self._transactional_id = self.config.pop("transactional.id", None)
-        self._buffer_handler = buffer_handler(
-            f"KProducer({id(self)})", self.buffer, self.config.pop("message.buffer", 300)
-        )
-        self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
-        self._max_retry_count = 3
-        self._retry_backoff = 0.01
-        self.transaction_inited = False
-        self.transaction_begun = False
+        self._key_serializer = config.pop("key.serializer", None)  # TODO: delete
+        self._value_serializer = config.pop("value.serializer", None)  # TODO: delete
+        self._transactional_id = config.get("transactional.id")
+        self._max_retry_count = config.get("retries", config.get("message.send.max.retries", 6))
+        self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
+        self.buffer = []
+        buffer_size = config.get("linger.ms", config.get("queue.buffering.max.messages", 300))
+        buffer_size = 2147483647 if buffer_size == 0 else buffer_size
+        buffer_max_ms = config.get("queue.buffering.max.ms", 5)
+        self._buffer_handler = buffer_handler(
+            f"KProducer({id(self)})", self.buffer, buffer_size, buffer_max_ms, transact=self._transactional_id is not None
+        )
+
+        self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
         self._buffer_handler.send(KSignals.INIT.value)
         self._kafka_simulator = KafkaSimulator()
         self._ticking_thread.start()
+
+        self.transaction_inited = False
+        self.transaction_begun = False
 
     def abort_transaction(self):
         if not self.transaction_begun:
@@ -51,13 +56,15 @@ class KProducer:
 
         self.purge()
         self._kafka_simulator.transaction_coordinator("abort", id(self), self._transactional_id)
+        key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.ABORT.value})
+        value = str({"producerId": id(self), "markerType": KMarkers.ABORT.value})
+        message = PMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
+        self._send_with_retry(message)
         self.transaction_begun = False
 
     def begin_transaction(self):
         if not self.transaction_inited:
             raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
-        # if not self._ticking_thread.is_alive():
-        #     self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
 
         self._kafka_simulator.transaction_coordinator("begin", id(self), self._transactional_id)
         self.transaction_begun = True
@@ -68,6 +75,10 @@ class KProducer:
 
         self.flush()
         self._kafka_simulator.transaction_coordinator("commit", id(self), self._transactional_id)
+        key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.COMMIT.value})
+        value = str({"producerId": id(self), "markerType": KMarkers.COMMIT.value})
+        message = PMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
+        self._send_with_retry(message)
         self.transaction_begun = False
 
     def flush(self, timeout: Optional[float] = None):
@@ -141,11 +152,8 @@ class KProducer:
             except Exception as se:
                 raise ValueSerializationError(se)
 
-        count = 0
-        while count < self._max_retry_count:
-            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
-                ack = self._buffer_handler.send(
-                    PMessage.from_producer_data(
+
+        message = PMessage.from_producer_data(
                         topic=topic,
                         partition=partition,
                         key=key,
@@ -154,15 +162,30 @@ class KProducer:
                         headers=headers,
                         on_delivery=on_delivery,
                     )
-                )
-                self.logger.debug("KProducer(%d): received ack: %s", id(self), ack)
-                break
-            else:
-                self.logger.debug("KProducer(%d): buffer is busy", id(self))
-                count += 1
-                sleep(count**2 * self._retry_backoff)
-        else:
-            raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
+        self._send_with_retry(message)
+
+        # count = 0
+        # while count < self._max_retry_count:
+        #     if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
+        #         ack = self._buffer_handler.send(
+        #             PMessage.from_producer_data(
+        #                 topic=topic,
+        #                 partition=partition,
+        #                 key=key,
+        #                 value=value,
+        #                 timestamp=timestamp,
+        #                 headers=headers,
+        #                 on_delivery=on_delivery,
+        #             )
+        #         )
+        #         self.logger.debug("KProducer(%d): received ack: %s", id(self), ack)
+        #         break
+        #     else:
+        #         self.logger.debug("KProducer(%d): buffer is busy", id(self))
+        #         count += 1
+        #         sleep(count**2 * self._retry_backoff)
+        # else:
+        #     raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
 
     def send_offsets_to_transaction(
         self, positions: list[TopicPartition], group_metadata: object, timeout: float = None
@@ -210,6 +233,21 @@ class KProducer:
             if remaining_time > 0:
                 sleep(remaining_time)
         return result
+
+    def _send_with_retry(self, message: PMessage) -> None:
+        """Send message to buffer handler with retry mechanism."""
+        count = 0
+        while count < self._max_retry_count:
+            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
+                ack = self._buffer_handler.send(message)
+                self.logger.debug("KProducer(%d): received ack: %s", id(self), ack)
+                break
+            else:
+                self.logger.debug("KProducer(%d): buffer is busy", id(self))
+                count += 1
+                sleep(count**2 * self._retry_backoff)
+        else:
+            raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
 
     def _done(self):
         """Additional method to gracefully close message buffer."""

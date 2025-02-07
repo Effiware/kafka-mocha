@@ -49,6 +49,7 @@ class ABCMessage(ABC):
     headers: Optional[tuple[KHeader, ...] | list[KHeader]] = field(default=None, compare=False)
     timestamp: tuple[int, int] = field(default=(TIMESTAMP_CREATE_TIME, -1), kw_only=True)
     compression_type: CompressionType = field(default=CompressionType.NONE, compare=False, kw_only=True)
+    marker: bool = field(default=False, kw_only=True)
 
     def __post_init__(self):
         if not isinstance(self.key, bytes):
@@ -135,7 +136,7 @@ class KRecord(ABCMessage):
             f"offset={self.offset}, "
             f"key={self.key}, "
             f"value={self.value}, "
-            f"timestamp={datetime.fromtimestamp(self.timestamp).isoformat()}, "
+            # f"timestamp={datetime.fromtimestamp(self.timestamp).isoformat()}, "
             f"headers={self.headers})"
             f")"
         )

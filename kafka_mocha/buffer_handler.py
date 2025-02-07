@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Callable, Literal
 
+from kafka_mocha.exceptions import KProducerProcessingException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
@@ -40,7 +41,7 @@ def get_partitioner(
     return partitioner
 
 
-def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2) -> None:
+def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2, transact: bool = False) -> None:
     """Start off with 1:1 relation to KProducer or KConsumer.
 
     Does not support custom timestamps (yet).
@@ -49,13 +50,13 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
     buffer_start_time = datetime.now()
     buffer_elapsed_time = 0
     buffer_loop_no = 0
+    transact_cache = defaultdict(list)
     kafka_simulator = KafkaSimulator()
     partitioner = get_partitioner(
         {topic.name: {"partition_no": topic.partition_no} for topic in kafka_simulator.topics}
     )
 
-    producer_protocol = kafka_simulator.handle_producers()
-    producer_protocol.send(KSignals.INIT.value)
+    kafka_handler = kafka_simulator.producers_handler
     res = KSignals.BUFFERED
     while True:
         while len(buffer) < buffer_size:  # TODO: byte size instead of length
@@ -70,6 +71,20 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
                     if buffer_elapsed_time >= buffer_timeout:
                         logger.debug("Buffer for %s: forcing flush due to timeout...", owner)
                         break
+            elif new_msg.marker:
+                if not transact:
+                    raise KProducerProcessingException("Transaction marker received but transaction is not enabled.")
+                if buffer:
+                    raise KProducerProcessingException("Transaction marker received but buffer is not empty.")
+                logger.debug("Buffer for %s: received marker: %s", owner, new_msg.marker)
+
+                markers_buffer = []
+                timestamp = (buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)).timestamp()
+                for topic, partitions in transact_cache.items():
+                    for partition in partitions:
+                        markers_buffer.append(PMessage(topic, partition, new_msg.key, new_msg.value, timestamp=timestamp, marker=new_msg.marker))
+                kafka_handler.send(markers_buffer)
+                transact_cache = dict()
             else:
                 new_msg.timestamp = (
                     buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
@@ -78,9 +93,10 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
                     partitioner(new_msg.topic, new_msg.key) if new_msg.partition == -1 else new_msg.partition
                 )
                 buffer.append(new_msg)
+                transact_cache[new_msg.topic].append(new_msg.partition) if transact else None
                 res = KSignals.BUFFERED
         if buffer:
-            res = producer_protocol.send(buffer)
+            res = kafka_handler.send(buffer)
             logger.info("Buffer for %s: Kafka response: %s", owner, res)
         else:
             logger.info("Buffer for %s: nothing to send...", owner)
