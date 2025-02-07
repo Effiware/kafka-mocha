@@ -1,11 +1,13 @@
 import json
 import os
+from collections import defaultdict
+from inspect import GEN_SUSPENDED, getgeneratorstate
 from threading import Lock
 from typing import Literal, Optional
 
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
-from kafka_mocha.exceptions import KafkaServerBootstrapException, KafkaSimulatorBootstrapException
+from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaSimulatorProcessingException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import KRecord, KTopic, PMessage
 from kafka_mocha.renderers import render
@@ -34,6 +36,8 @@ class KafkaSimulator:
     - wrapper function parameters (e.g. mock_producer, mock_consumer, either as a decorator or context manager)
     """
 
+    TRANSACT_TOPIC = "__transaction_state"
+    TRANSACT_TOPIC_PARTITION_NO = 50
     _instance = None
     _lock = Lock()
     _is_running = False
@@ -48,9 +52,11 @@ class KafkaSimulator:
     def __init__(self):
         self.one_ack_delay = ONE_ACK_DELAY
         self.all_ack_delay = ALL_ACK_DELAY
-        self.topics = [KTopic.from_env(topic) for topic in TOPICS]
+        self.topics: list[KTopic] = [KTopic.from_env(topic) for topic in TOPICS]
         self.topics.append(KTopic("_schemas"))  #  Built-in `_schemas` topic
         self.topics.append(KTopic("__consumer_offsets"))  #  Built-in `__consumer_offsets` topic
+        self._registered_transact_ids: dict[str, list[int]] = defaultdict(list)  # Producer's epoch = list length
+
         logger.info(f"Kafka Simulator initialized")
         logger.debug(f"Registered topics: {self.topics}")
 
@@ -104,6 +110,63 @@ class KafkaSimulator:
         else:
             return self._topics_2_cluster_metadata([])
 
+    def register_producer_transaction_id(self, producer_id: int, transactional_id: str) -> None:
+        """Registers transactional id for producer. Also, prepares transaction coordinator and needed infrastructure."""
+        topics = list(filter(lambda x: x.name == self.TRANSACT_TOPIC, self.topics))
+        if not topics:
+            # Register transaction log topic
+            topic = KTopic(self.TRANSACT_TOPIC, self.TRANSACT_TOPIC_PARTITION_NO, config={"cleanup.policy": "compact"})
+            self.topics.append(topic)
+        self._registered_transact_ids[transactional_id].append(producer_id)
+
+    def transaction_coordinator(
+        self, state: Literal["init", "begin", "commit", "abort"], producer_id: int, transactional_id: str
+    ):
+        """Transaction coordinator that handles transaction(s) flow."""
+        handler = self.handle_producers()
+        if getgeneratorstate(handler) != GEN_SUSPENDED:
+            raise KafkaSimulatorProcessingException(
+                "Potential bug: producers handler should be suspended at this point..."
+            )
+
+        producer_epoch = len(self._registered_transact_ids[transactional_id]) - 1
+        msg_partition = hash(transactional_id) % self.TRANSACT_TOPIC_PARTITION_NO
+        msg_key = {"transactionalId": transactional_id, "version": 0}
+        msg_value = {
+            "transactionalId": transactional_id,
+            "producerId": producer_id,
+            "lastProducerId": -1,
+            "producerEpoch": producer_epoch,
+            "lastProducerEpoch": -1,
+            "txnTimeoutMs": 60000,
+            "state": "",
+            "topicPartitions": [],
+            "txnStartTimestamp": -1,
+            "txnLastUpdateTimestamp": -1,
+        }
+
+        match state:
+            case "init":
+                self.register_producer_transaction_id(producer_id, transactional_id)
+                msg_value["state"] = "Empty"
+                msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
+            case "begin":
+                msg_value["state"] = "Ongoing"
+                msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
+            case "commit":
+                msg_value["state"] = "PrepareCommit"
+                msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
+                msg_value["state"] = "CompleteCommit"
+                msgs.append(
+                    PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())
+                )
+            case "abort":
+                msgs = []
+            case _:
+                raise ValueError(f"Invalid transaction state: {state}")
+
+        handler.send(msgs)
+
     def handle_producers(self):
         """A separate generator function that yields a signal to the caller. Handles incoming messages from producers.
 
@@ -117,7 +180,7 @@ class KafkaSimulator:
             for msg in received_msgs:
                 _msg_destination_topic = [topic for topic in self.topics if topic.name == msg.topic]
                 if not _msg_destination_topic and not AUTO_CREATE_TOPICS_ENABLE:
-                    raise KafkaServerBootstrapException(
+                    raise KafkaSimulatorProcessingException(
                         f"Topic {msg.topic} does not exist and "
                         f"KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE set to {AUTO_CREATE_TOPICS_ENABLE} "
                     )
@@ -125,13 +188,13 @@ class KafkaSimulator:
                     self.topics.append(KTopic(msg.topic, 1))
                     _msg_destination_topic = self.topics
                 elif len(_msg_destination_topic) > 1:
-                    raise KafkaServerBootstrapException("We have a bug here....")
+                    raise KafkaSimulatorProcessingException("We have a bug here....")
 
                 _topic = _msg_destination_topic[-1]  # [kpartition][-1] == kpartition
                 try:
                     partition = _topic.partitions[msg.partition]
                 except IndexError:
-                    raise KafkaServerBootstrapException(f"Invalid partition assignment: {msg.partition}")
+                    raise KafkaSimulatorProcessingException(f"Invalid partition assignment: {msg.partition}")
                 else:
                     if msg.pid:
                         _msg_pid_already_appended = msg.pid in [krecord.pid for krecord in partition._heap]

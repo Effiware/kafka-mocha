@@ -2,7 +2,7 @@ class KafkaSimulatorBootstrapException(Exception):
     pass
 
 
-class KafkaServerBootstrapException(Exception):
+class KafkaSimulatorProcessingException(Exception):
     pass
 
 

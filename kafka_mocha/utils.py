@@ -170,9 +170,13 @@ def validate_producer_config(config) -> None:
     enable_idempotence = config.get("enable.idempotence")
     transaction_ms = config.get("transaction.timeout.ms")
     if transactional_id and not enable_idempotence:
-        raise KafkaClientBootstrapException("Configuration validation errors: transactional.id requires enable.idempotence")
+        raise KafkaClientBootstrapException(
+            "Configuration validation errors: transactional.id requires enable.idempotence"
+        )
     if transaction_ms and not transactional_id:
-        raise KafkaClientBootstrapException("Configuration validation errors: transaction.timeout.ms requires transactional.id")
+        raise KafkaClientBootstrapException(
+            "Configuration validation errors: transaction.timeout.ms requires transactional.id"
+        )
 
 
 def validate_consumer_config(config) -> None:

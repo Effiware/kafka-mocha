@@ -7,7 +7,6 @@ from confluent_kafka import KafkaException, TopicPartition
 from confluent_kafka.error import KeySerializationError, ValueSerializationError
 from confluent_kafka.serialization import MessageField, SerializationContext
 
-from kafka_mocha.utils import validate_config
 from kafka_mocha.buffer_handler import buffer_handler
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
 from kafka_mocha.kafka_simulator import KafkaSimulator
@@ -15,6 +14,7 @@ from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
 from kafka_mocha.signals import KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
+from kafka_mocha.utils import validate_config
 
 
 class KProducer:
@@ -46,17 +46,29 @@ class KProducer:
         self._ticking_thread.start()
 
     def abort_transaction(self):
+        if not self.transaction_begun:
+            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
+
         self.purge()
+        self._kafka_simulator.transaction_coordinator("abort", id(self), self._transactional_id)
+        self.transaction_begun = False
 
     def begin_transaction(self):
         if not self.transaction_inited:
-            raise KafkaException("TODO")
-        if not self._ticking_thread.is_alive():
-            self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
+            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
+        # if not self._ticking_thread.is_alive():
+        #     self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
+
+        self._kafka_simulator.transaction_coordinator("begin", id(self), self._transactional_id)
         self.transaction_begun = True
 
     def commit_transaction(self):
-        self._done()
+        if not self.transaction_begun:
+            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
+
+        self.flush()
+        self._kafka_simulator.transaction_coordinator("commit", id(self), self._transactional_id)
+        self.transaction_begun = False
 
     def flush(self, timeout: Optional[float] = None):
         """Duck type for confluent_kafka/cimpl.py::flush (see signature there).
@@ -73,8 +85,14 @@ class KProducer:
             return start_buffer_len - buffer_len
 
     def init_transactions(self):
+        if self._transactional_id is None:
+            # TODO: Check if this is the correct
+            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
+        if self.transaction_inited:
+            raise KafkaException("{code=_STATE,val=-172,str='Operation not valid in state Ready'}")
+
+        self._kafka_simulator.transaction_coordinator("init", id(self), self._transactional_id)
         self.transaction_inited = True
-        self.logger.warning("KProducer doesn't support transactions (yet). Skipping...")
 
     def list_topics(self, topic: str = None, timeout: float = -1.0, *args, **kwargs):
         """Duck type for confluent_kafka/cimpl.py::list_topics (see signature there).
