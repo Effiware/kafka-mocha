@@ -40,7 +40,7 @@ def get_partitioner(
     return partitioner
 
 
-def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2):
+def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2) -> None:
     """Start off with 1:1 relation to KProducer or KConsumer.
 
     Does not support custom timestamps (yet).
@@ -87,7 +87,7 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
         if res == KSignals.SUCCESS:
             try:
                 for msg in buffer:
-                    msg.on_delivery(None, "TODO: add proper message")
+                    msg.on_delivery(None, "TODO: add proper message")  # TODO
             except Exception as e:
                 logger.error("Buffer for %s: Error while executing callback: %s", owner, e)
             finally:

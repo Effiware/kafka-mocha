@@ -107,8 +107,11 @@ def test_validate_common_config_required_fields() -> None:
 def test_validate_producer_config_happy_path(key: str, value: Any) -> None:
     """Test validate_common_config with valid configuration parameters."""
 
-    config = {key: value}
-    validate_producer_config(config)
+    if key in ["transactional.id", "transaction.timeout.ms"]:
+        assert True  # Transactional configuration parameters are covered in other tests
+    else:
+        config = {key: value}
+        validate_producer_config(config)
 
 
 @pytest.mark.parametrize("key, value", invalid_config_factory("producer"))
@@ -116,6 +119,28 @@ def test_validate_producer_config_unhappy_path(key: str, value: Any) -> None:
     """Test validate_producer_config with invalid configuration parameters."""
 
     config = {key: value}
+    with pytest.raises(KafkaClientBootstrapException):
+        validate_producer_config(config)
+
+
+def test_validate_producer_config_transactional_happy_path() -> None:
+    """Test validate_producer_config with valid transactional configuration parameters."""
+
+    config = {"enable.idempotence": True, "transactional.id": "test-id"}
+    validate_producer_config(config)
+
+    config = {"enable.idempotence": True, "transactional.id": "test-id", "transaction.timeout.ms": 100000}
+    validate_producer_config(config)
+
+
+def test_validate_producer_config_transactional_unhappy_path() -> None:
+    """Test validate_producer_config with invalid transactional configuration parameters."""
+
+    config = {"transactional.id": "test-id"}
+    with pytest.raises(KafkaClientBootstrapException):
+        validate_producer_config(config)
+
+    config = {"enable.idempotence": True, "transaction.timeout.ms": 100000}
     with pytest.raises(KafkaClientBootstrapException):
         validate_producer_config(config)
 
@@ -140,10 +165,10 @@ def test_validate_consumer_config_unhappy_path(key: str, value: Any) -> None:
 def test_validate_config_strategy_producer() -> None:
     """Test validate_config with producer configuration parameters."""
 
-    validate_config("producer", {**valid_common_string_fields, "acks": 1, "transactional.id": "test-transactional-id"})
+    validate_config("producer", {**valid_common_string_fields, "acks": 1, "enable.idempotence": False})
     with pytest.raises(KafkaClientBootstrapException):
         validate_config(
-            "common", {**valid_common_string_fields, "acks": 1, "transactional.id": "test-transactional-id"}
+            "common", {**valid_common_string_fields, "acks": 1, "enable.idempotence": False}
         )
 
 
@@ -153,3 +178,10 @@ def test_validate_config_strategy_consumer() -> None:
     validate_config("consumer", {**valid_common_string_fields, "group.id": "test-group-id"})
     with pytest.raises(KafkaClientBootstrapException):
         validate_config("common", {**valid_common_string_fields, "group.id": "test-group-id"})
+
+
+def test_validate_config_strategy_dummy() -> None:
+    """Test validate_config with dummy configuration parameters."""
+
+    with pytest.raises(ValueError):
+        validate_config("dummy", valid_common_string_fields)  # noqa

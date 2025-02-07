@@ -166,6 +166,14 @@ def validate_producer_config(config) -> None:
 
     _validate_against_schema(producer_config_schema, config)
 
+    transactional_id = config.get("transactional.id")
+    enable_idempotence = config.get("enable.idempotence")
+    transaction_ms = config.get("transaction.timeout.ms")
+    if transactional_id and not enable_idempotence:
+        raise KafkaClientBootstrapException("Configuration validation errors: transactional.id requires enable.idempotence")
+    if transaction_ms and not transactional_id:
+        raise KafkaClientBootstrapException("Configuration validation errors: transaction.timeout.ms requires transactional.id")
+
 
 def validate_consumer_config(config) -> None:
     """Validates producer's (C/P = C) configuration options for KafkaProducer.
@@ -199,7 +207,7 @@ def validate_config(config_type: Literal["common", "producer", "consumer"], conf
                 rest_config[key] = value
         validate_producer_config(producer_only_config)
         validate_common_config(rest_config)
-    else:
+    elif config_type == "consumer":
         consumer_only_config = {**config}
         rest_config = {}
 
@@ -209,3 +217,5 @@ def validate_config(config_type: Literal["common", "producer", "consumer"], conf
                 rest_config[key] = value
         validate_consumer_config(consumer_only_config)
         validate_common_config(rest_config)
+    else:
+        raise ValueError("Invalid configuration type")

@@ -66,4 +66,4 @@ def kproducer(kafka):
     """Returns KProducer instance."""
     import kafka_mocha.kproducer as kp
 
-    return kp.KProducer({})
+    return kp.KProducer({"bootstrap.servers": "localhost:9092"})

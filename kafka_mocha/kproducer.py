@@ -31,6 +31,7 @@ class KProducer:
         self.buffer = []
         self._key_serializer = self.config.pop("key.serializer", None)
         self._value_serializer = self.config.pop("value.serializer", None)
+        self._transactional_id = self.config.pop("transactional.id", None)
         self._buffer_handler = buffer_handler(
             f"KProducer({id(self)})", self.buffer, self.config.pop("message.buffer", 300)
         )
