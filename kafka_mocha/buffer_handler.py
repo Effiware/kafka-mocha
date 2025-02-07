@@ -41,7 +41,9 @@ def get_partitioner(
     return partitioner
 
 
-def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2, transact: bool = False) -> None:
+def buffer_handler(
+    owner: str, buffer: list[PMessage], buffer_size: int, buffer_timeout: int = 2, transact: bool = False
+) -> None:
     """Start off with 1:1 relation to KProducer or KConsumer.
 
     Does not support custom timestamps (yet).
@@ -79,10 +81,16 @@ def buffer_handler(owner: str, buffer: list[PMessage], buffer_size: int, buffer_
                 logger.debug("Buffer for %s: received marker: %s", owner, new_msg.marker)
 
                 markers_buffer = []
-                timestamp = (buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)).timestamp()
+                timestamp = (
+                    buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
+                ).timestamp()
                 for topic, partitions in transact_cache.items():
                     for partition in partitions:
-                        markers_buffer.append(PMessage(topic, partition, new_msg.key, new_msg.value, timestamp=timestamp, marker=new_msg.marker))
+                        markers_buffer.append(
+                            PMessage(
+                                topic, partition, new_msg.key, new_msg.value, timestamp=timestamp, marker=new_msg.marker
+                            )
+                        )
                 kafka_handler.send(markers_buffer)
                 transact_cache = dict()
             else:

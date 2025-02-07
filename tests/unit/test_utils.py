@@ -167,9 +167,7 @@ def test_validate_config_strategy_producer() -> None:
 
     validate_config("producer", {**valid_common_string_fields, "acks": 1, "enable.idempotence": False})
     with pytest.raises(KafkaClientBootstrapException):
-        validate_config(
-            "common", {**valid_common_string_fields, "acks": 1, "enable.idempotence": False}
-        )
+        validate_config("common", {**valid_common_string_fields, "acks": 1, "enable.idempotence": False})
 
 
 def test_validate_config_strategy_consumer() -> None:

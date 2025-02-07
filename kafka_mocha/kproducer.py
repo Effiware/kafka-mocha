@@ -12,7 +12,7 @@ from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutE
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models import PMessage
-from kafka_mocha.signals import KSignals, Tick, KMarkers
+from kafka_mocha.signals import KMarkers, KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
 from kafka_mocha.utils import validate_config
 
@@ -39,7 +39,11 @@ class KProducer:
         buffer_size = 2147483647 if buffer_size == 0 else buffer_size
         buffer_max_ms = config.get("queue.buffering.max.ms", 5)
         self._buffer_handler = buffer_handler(
-            f"KProducer({id(self)})", self.buffer, buffer_size, buffer_max_ms, transact=self._transactional_id is not None
+            f"KProducer({id(self)})",
+            self.buffer,
+            buffer_size,
+            buffer_max_ms,
+            transact=self._transactional_id is not None,
         )
 
         self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
@@ -152,16 +156,15 @@ class KProducer:
             except Exception as se:
                 raise ValueSerializationError(se)
 
-
         message = PMessage.from_producer_data(
-                        topic=topic,
-                        partition=partition,
-                        key=key,
-                        value=value,
-                        timestamp=timestamp,
-                        headers=headers,
-                        on_delivery=on_delivery,
-                    )
+            topic=topic,
+            partition=partition,
+            key=key,
+            value=value,
+            timestamp=timestamp,
+            headers=headers,
+            on_delivery=on_delivery,
+        )
         self._send_with_retry(message)
 
         # count = 0
