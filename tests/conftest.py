@@ -1,5 +1,6 @@
 import os
 from importlib import reload
+from logging import LogRecord
 
 from pytest import fixture
 
@@ -7,6 +8,19 @@ from pytest import fixture
 @fixture
 def foo_header() -> tuple:
     return "header_key", "header_value".encode("utf-8")
+
+
+@fixture(scope="function")
+def foo_log_record() -> LogRecord:
+    return LogRecord(
+        name="foo",
+        level=20,
+        pathname="foo.py",
+        lineno=42,
+        msg="foo",
+        args=(),
+        exc_info=None,
+    )
 
 
 @fixture(scope="module")

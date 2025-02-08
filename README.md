@@ -4,7 +4,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - License](https://img.shields.io/pypi/l/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
-[![PyPI - Status](https://img.shields.io/pypi/status/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Coverage](https://img.shields.io/badge/coverage-91%25-gree)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - Implementation](https://img.shields.io/pypi/implementation/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 

@@ -11,11 +11,20 @@ from kafka_mocha.signals import KSignals, Tick
 logger = get_custom_logger()
 
 
+def _get_elapsed_time(
+    buffer_start_time: datetime, buffer_loop_no: int, buffer_timeout: int, buffer_elapsed_time: int
+) -> float:
+    """Calculate elapsed time based on buffer loop number and timeout."""
+    return (
+        buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
+    ).timestamp()
+
+
 def get_partitioner(
     topics: dict[str, dict], strategy: Literal["default", "round-robin", "uniform-sticky"] = "default"
 ) -> Callable[[str, bytes], int]:
     """Strategy pattern (as closure) returning requested kafka producer partitioner."""
-    last_assigned_partitions = defaultdict(int)
+    last_assigned_partitions = defaultdict(lambda: -1)
 
     match strategy:
         case "default":
@@ -37,7 +46,7 @@ def get_partitioner(
                 return new_partition
 
         case _:
-            raise NotImplemented(f"Custom strategy and/or {strategy} not yet implemented.")
+            raise NotImplementedError(f"Custom strategy and/or {strategy} not yet implemented.")
     return partitioner
 
 
@@ -64,6 +73,7 @@ def buffer_handler(
         while len(buffer) < buffer_size:  # TODO: byte size instead of length
             new_msg: PMessage | int | float = yield res
             if isinstance(new_msg, int) or isinstance(new_msg, float):
+                # Float/int = Tick signal received
                 if new_msg == Tick.DONE:
                     logger.debug("Buffer for %s: received done (or manual flush) signal...", owner)
                     break
@@ -74,6 +84,7 @@ def buffer_handler(
                         logger.debug("Buffer for %s: forcing flush due to timeout...", owner)
                         break
             elif new_msg.marker:
+                # Transaction marker received
                 if not transact:
                     raise KProducerProcessingException("Transaction marker received but transaction is not enabled.")
                 if buffer:
@@ -81,22 +92,19 @@ def buffer_handler(
                 logger.debug("Buffer for %s: received marker: %s", owner, new_msg.marker)
 
                 markers_buffer = []
-                timestamp = (
-                    buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
-                ).timestamp()
+                ts = _get_elapsed_time(buffer_start_time, buffer_loop_no, buffer_timeout, buffer_elapsed_time)
                 for topic, partitions in transact_cache.items():
                     for partition in partitions:
                         markers_buffer.append(
-                            PMessage(
-                                topic, partition, new_msg.key, new_msg.value, timestamp=timestamp, marker=new_msg.marker
-                            )
+                            PMessage(topic, partition, new_msg.key, new_msg.value, timestamp=ts, marker=new_msg.marker)
                         )
                 kafka_handler.send(markers_buffer)
                 transact_cache = dict()
             else:
-                new_msg.timestamp = (
-                    buffer_start_time + timedelta(milliseconds=buffer_loop_no * buffer_timeout + buffer_elapsed_time)
-                ).timestamp()
+                # (Normal) PMessage received
+                new_msg.timestamp = _get_elapsed_time(
+                    buffer_start_time, buffer_loop_no, buffer_timeout, buffer_elapsed_time
+                )
                 new_msg.partition = (
                     partitioner(new_msg.topic, new_msg.key) if new_msg.partition == -1 else new_msg.partition
                 )

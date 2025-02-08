@@ -167,29 +167,6 @@ class KProducer:
         )
         self._send_with_retry(message)
 
-        # count = 0
-        # while count < self._max_retry_count:
-        #     if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
-        #         ack = self._buffer_handler.send(
-        #             PMessage.from_producer_data(
-        #                 topic=topic,
-        #                 partition=partition,
-        #                 key=key,
-        #                 value=value,
-        #                 timestamp=timestamp,
-        #                 headers=headers,
-        #                 on_delivery=on_delivery,
-        #             )
-        #         )
-        #         self.logger.debug("KProducer(%d): received ack: %s", id(self), ack)
-        #         break
-        #     else:
-        #         self.logger.debug("KProducer(%d): buffer is busy", id(self))
-        #         count += 1
-        #         sleep(count**2 * self._retry_backoff)
-        # else:
-        #     raise KProducerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
-
     def send_offsets_to_transaction(
         self, positions: list[TopicPartition], group_metadata: object, timeout: float = None
     ):
