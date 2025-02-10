@@ -16,12 +16,14 @@ from kafka_mocha.signals import KMarkers, KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
 from kafka_mocha.utils import validate_config
 
+MAX_BUFFER_LEN = 2147483647
+
 
 class KProducer:
     def __init__(
         self,
         config: dict[str, Any],
-        output: Optional[Literal["html", "csv"]] = None,
+        output: Optional[dict[str, Any]] = None,
         loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR",
     ):
         validate_config("producer", config)
@@ -35,13 +37,13 @@ class KProducer:
         self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
         self.buffer = []
-        buffer_size = config.get("linger.ms", config.get("queue.buffering.max.messages", 300))
-        buffer_size = 2147483647 if buffer_size == 0 else buffer_size
-        buffer_max_ms = config.get("queue.buffering.max.ms", 5)
+        buffer_len = config.get("queue.buffering.max.messages", 5)
+        buffer_len = MAX_BUFFER_LEN if buffer_len == 0 else buffer_len
+        buffer_max_ms = config.get("linger.ms", config.get("queue.buffering.max.ms", 300))
         self._buffer_handler = buffer_handler(
             f"KProducer({id(self)})",
             self.buffer,
-            buffer_size,
+            buffer_len,
             buffer_max_ms,
             transact=self._transactional_id is not None,
         )

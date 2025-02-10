@@ -3,7 +3,7 @@ from time import sleep
 
 from confluent_kafka import TIMESTAMP_CREATE_TIME
 
-from kafka_mocha.models import KRecord, KTopic
+from kafka_mocha.models import KRecord, KTopic, KHeader
 from kafka_mocha.renderers import render_csv, render_html
 
 
@@ -24,6 +24,7 @@ def test_render_html() -> None:
                         key=f"key_{individual}".encode(),
                         value=f"value_{individual}".encode(),
                         timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000)),
+                        headers=[KHeader("header_key", b"header_value")] if individual % 3 == 0 else None
                     )
                 )
                 sleep(0.01)
@@ -52,6 +53,7 @@ def test_render_csv() -> None:
                         key=f"key_{individual}".encode(),
                         value=f"value_{individual}".encode(),
                         timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000)),
+                        headers=(KHeader("header_key", b"header_value"),) if individual % 2 == 0 else None
                     )
                 )
                 sleep(0.1)

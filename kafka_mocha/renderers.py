@@ -12,45 +12,62 @@ environment = Environment(loader=FileSystemLoader(Path(__file__).parent / "templ
 
 
 def _prepare_records(topics: list[KTopic]) -> list[dict[str, Any]]:
-    """Prepares records for rendering."""
+    """Prepares records for rendering. Merge records from all partitions and sort them by timestamp."""
     topic_records = []
     for topic in topics:
         topic_records.append(
             {
                 "name": topic.name,
-                "messages": reduce(lambda x, y: x + y, [partition._heap for partition in topic.partitions], []),
+                "messages": sorted(
+                    reduce(lambda x, y: x + y, [partition._heap for partition in topic.partitions], []),
+                    key=lambda x: x[5][1],
+                ),
             }
         )
     return topic_records
 
 
-def render_html(topics: list[KTopic], output_name: str = "messages.html") -> None:
+def render_html(topics: list[KTopic], **kwargs) -> None:
     """Renders HTML output from the records sent to Kafka."""
     template = environment.get_template("messages.html.jinja")
     topic_records = _prepare_records(topics)
-    content = template.render(timestamp=datetime.now(UTC).isoformat(), os=system(), topics=topic_records)
+    output_name = kwargs.get("name", "messages.html")
+    include_internal_topics = kwargs.get("include_internal_topics", False)
+    include_markers = kwargs.get("include_markers", False)
+
+    content = template.render(
+        timestamp=datetime.now().astimezone().isoformat(timespec="seconds").replace("+", " + "),
+        os=system(),
+        topics=topic_records,
+        include_markers=include_markers,
+    )
     with open(output_name, mode="w", encoding="utf-8") as output:
         output.write(content)
 
 
-def render_csv(topics: list[KTopic], output_name: str = "messages.csv") -> None:
+def render_csv(topics: list[KTopic], **kwargs) -> None:
     """Renders CSV output from the records sent to Kafka."""
     template = environment.get_template("messages.csv.jinja")
     topic_records = _prepare_records(topics)
-    content = template.render(topics=topic_records)
-    content = "\n".join([line.replace("# Topic:", "\n# Topic:") for line in content.split("\n") if line.strip() != ""])[
-        1:
-    ]
+    include_internal_topics = kwargs.get("include_internal_topics", False)
+    include_markers = kwargs.get("include_markers", False)
 
-    with open(output_name, mode="w", encoding="utf-8") as output:
-        output.write(content)
+    for topic in topic_records:
+        output_name = topic["name"] + ".csv"
+        content = template.render(messages=topic["messages"], include_markers=include_markers)
+        content = "\n".join(
+            [line.replace("# Topic:", "\n# Topic:") for line in content.split("\n") if line.strip() != ""]
+        )
+        with open(output_name, mode="w", encoding="utf-8") as output:
+            output.write(content)
 
 
-def render(output: Literal["html", "csv"], records: list[KTopic], output_name: Optional[str] = None) -> None:
+def render(output: Literal["html", "csv"], records: list[KTopic], **kwargs) -> None:
     """Strategy pattern for rendering output."""
-    if output == "html":
-        render_html(records, output_name) if output_name else render_html(records)
-    elif output == "csv":
-        render_csv(records, output_name) if output_name else render_csv(records)
-    else:
-        raise ValueError(f"Unsupported output format: {output}")
+    match output:
+        case "html":
+            render_html(records, **kwargs)
+        case "csv":
+            render_csv(records, **kwargs)
+        case _:
+            raise ValueError(f"Unsupported output format: {output}")

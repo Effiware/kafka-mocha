@@ -1,7 +1,4 @@
-{% for topic in topics %}
-# Topic: {{ topic.name }}
 Timestamp,Partition,Offset,Key,Value,Headers
-{% for message in topic.messages %}
+{% for message in messages if include_markers or not message.7 %}
 {{ message.5.1 }},{{ message.1 }},{{ message.8 }},{{ message.2 }},{{ message.3 }},{% if message.4 %}{{ message.4 | join(';') }}{% else %}null{% endif %}
-{% endfor %}
 {% endfor %}

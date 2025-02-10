@@ -1,5 +1,5 @@
 from functools import partial, wraps
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from unittest.mock import patch
 
 from kafka_mocha.kproducer import KProducer
@@ -13,7 +13,7 @@ class mock_producer:
 
     def __init__(
         self,
-        output: Optional[Literal["html", "csv"]] = None,
+        output: Optional[dict[str, Any]] = None,
         loglevel: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = None,
     ):
         self._patcher = (

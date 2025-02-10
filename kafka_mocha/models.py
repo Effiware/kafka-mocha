@@ -83,8 +83,7 @@ class PMessage(ABCMessage):
         kwargs["key"] = _key.encode() if isinstance(_key, str) else _key
         kwargs["value"] = _value.encode() if isinstance(_value, str) else _value
         if timestamp != 0:
-            _timestamp = timestamp / 1000
-            return cls(headers=k_headers, timestamp=_timestamp, **kwargs)
+            return cls(headers=k_headers, timestamp=(TIMESTAMP_CREATE_TIME, timestamp), **kwargs)
         return cls(headers=k_headers, **kwargs)
 
 

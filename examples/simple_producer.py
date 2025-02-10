@@ -74,7 +74,7 @@ def as_context_manager():
         # some post-processing
 
 
-@mock_producer(output="html")
+@mock_producer(output={"format": "html"})
 def as_decorated_inner_function():
     """It can be used as a decorator around an inner function. Explicitly set output to HTML.
 

@@ -114,11 +114,14 @@ The `KProducer` class replicates the interface and behavior of the `Producer` cl
 <details>
 <summary>Parameters for mock_producer</summary>
 
-| No | Parameter name | Parameter type | Comment                                              |
-|----|----------------|----------------|------------------------------------------------------|
-| 1  | loglevel       | Literal        | See available levels in `logging` library            |
-| 2  | output         | Literal        | html, csv or int - output format of messages emitted |
-| 3  |                |                |                                                      |
+| No | Parameter name                 | Parameter type | Comment                                                       |
+|----|--------------------------------|----------------|---------------------------------------------------------------|
+| 1  | loglevel                       | Literal        | See available levels in `logging` library                     |
+| 2  | output                         | dict           | Dictionary with output configuration                          |
+| 3  | output.format                  | Literal        | `html`, `csv` or `int` - output format of messages emitted    |
+| 4  | output.name                    | str            | Name of the output file (only for HTML), e.g. kafka-dump.html |
+| 5  | output.include_internal_topics | bool           | Flag to include internal topics in the output                 |
+| 6  | output.include_markers         | bool           | Flag to include transaction markers in the output             |
 
 </details>
 

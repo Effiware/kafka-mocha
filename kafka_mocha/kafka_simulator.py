@@ -3,7 +3,7 @@ import os
 from collections import defaultdict
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from threading import Lock
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
@@ -233,10 +233,11 @@ class KafkaSimulator:
     #         except StopIteration:
     #             print("[KAFKA] Producers handled")
 
-    def render_records(self, output: Literal["html", "csv"]):
+    def render_records(self, output: dict[str, Any]):
         """Renders Kafka records in the specified format."""
-        if output:
-            render(output, self.topics)
+        _format = output.pop("format", None)
+        if _format is not None:
+            render(_format, self.topics, **output)
         else:
             logger.error("No output format has been set. Rendering skipped.")
 
