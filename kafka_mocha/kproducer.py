@@ -24,7 +24,7 @@ class KProducer:
         self,
         config: dict[str, Any],
         output: Optional[dict[str, Any]] = None,
-        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "ERROR",
+        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
     ):
         validate_config("producer", config)
         self.config = config
@@ -239,6 +239,15 @@ class KProducer:
 
     def __del__(self):
         if hasattr(self, "config"):  # if __init__ was called without exceptions
+            if (curr_buff_len := len(self.buffer)) > 0:
+                self.logger.warning(
+                    "You may have a bug: Producer terminating with %d messages (%d bytes) still in queue or "
+                    "transit: use flush() to wait for outstanding message delivery. "
+                    "KProducer will flush them for you, but familiarize yourself with: %s",
+                    curr_buff_len,
+                    666,  # TODO: calculate bytes
+                    "https://github.com/confluentinc/confluent-kafka-python/issues/137#issuecomment-282427382",
+                )
             self._done()
             if self.output:
                 self._kafka_simulator.render_records(self.output)
