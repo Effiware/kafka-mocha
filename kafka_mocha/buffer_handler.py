@@ -97,10 +97,10 @@ def buffer_handler(
     kafka_handler = kafka_simulator.producers_handler
     res = KSignals.BUFFERED
     while True:
-        while len(buffer) < buffer_len:  # TODO: byte size instead of length
-            new_msg: PMessage | int | float = yield res
-            if isinstance(new_msg, int) or isinstance(new_msg, float):
-                # Float/int = Tick signal received
+        while len(buffer) < buffer_len:  # TODO: Add support for batch size (bytes)
+            new_msg: PMessage | int = yield res
+            if isinstance(new_msg, int):
+                # Int = Tick signal received
                 if new_msg == Tick.DONE:
                     logger.debug("Buffer for %s: received done (or manual flush) signal...", owner)
                     break

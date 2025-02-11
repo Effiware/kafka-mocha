@@ -34,7 +34,7 @@ def transactional_producer_basic():
     # some post-processing
 
 
-@mock_producer(output={"format": "html", "name": "transaction-multi.html"})
+@mock_producer(output={"format": "html", "name": "transaction-multi.html", "include_internal_topics": True})
 def transactional_producer_multiple_topics():
     """Supports transactional producers. It can be used as a direct function wrapper. Explicitly set output to CSV.
 

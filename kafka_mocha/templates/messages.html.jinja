@@ -113,9 +113,9 @@
              style="width: 170px; height: auto; margin-top: 10px;">
     </a>
     <h1>Embedded Kafka - message dump</h1>
-    <p>Timestamp (local): {{ timestamp }}</p>
+    <p>Generated at: {{ timestamp }}</p>
     <div class="tabs" id="tabs">
-        {% for topic in topics %}
+        {% for topic in topics | sort(attribute='name') %}
             <div class="tab" onclick="showTopic('{{ topic.name }}')">{{ topic.name }}</div>
         {% endfor %}
     </div>

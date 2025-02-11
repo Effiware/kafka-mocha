@@ -178,5 +178,5 @@ __pypackages__/
 
 # Project
 c-algorithms/
-messages.csv
-messages.html
+**.csv
+**.html
