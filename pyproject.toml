@@ -28,6 +28,8 @@ confluent-kafka = "^2.0.0"
 httpx = "^0.28.1"
 cachetools = "^5.5.1"
 fastavro = "^1.10.0"
+referencing = "^0.36.2"
+jsonschema = "^4.23.0"
 
 [build-system]
 requires = ["poetry-core"]

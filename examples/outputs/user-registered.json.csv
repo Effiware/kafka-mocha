@@ -1,0 +1,2 @@
+Timestamp,Partition,Offset,Key,Value,Headers
+1739737868404,0,1000,b'9aa76a26-29e3-42d4-9f8e-9303eacc1b00',b'\x00\x00\x00\x00\x01{"user_id": "9aa76a26-29e3-42d4-9f8e-9303eacc1b00", "user_name": "Joe", "user_last_name": "Don", "is_new_user": true, "subscription_type": "LITE", "registration_timestamp": 1739737868404, "score": 0.0, "envelope": {"envelope_id": "5a046884-b529-4202-b467-59b5fb058e55", "event_timestamp": 1739737868404, "app_name": "kafka_mocha_examples", "app_version": "1.0.0"}}',null

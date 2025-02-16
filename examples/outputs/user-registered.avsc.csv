@@ -1,0 +1,2 @@
+Timestamp,Partition,Offset,Key,Value,Headers
+1739737357204,0,1000,b'3b64b3a7-5a92-4087-aacd-2e3d785364ab',b'\x00\x00\x00\x00\x01H3b64b3a7-5a92-4087-aacd-2e3d785364ab\x08John\x06Doe\x01\x04\xa8\xee\xea\x86\xa2e\x00\x00\x00\x00\x00\x00\x00\x00H3d756b8e-21ad-4407-9c56-35f3b419f808\xa8\xee\xea\x86\xa2e(kafka_mocha_examples\n1.0.0',null
