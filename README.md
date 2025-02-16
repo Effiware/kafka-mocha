@@ -39,6 +39,7 @@ a mock for the `Producer` from the `confluent_kafka` package. A `KConsumer` clas
     - [Starting Kafka Simulator](#starting-kafka-simulator)
     - [KProducer](#kproducer)
     - [KConsumer](#kconsumer)
+    - [Schema Registry Mock](#schema-registry-mock)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -152,6 +153,10 @@ from the `confluent_kafka` library.
 
 </details>
 
+### Schema Registry Mock
+
+TODO
+
 ## Contributing
 
 We welcome contributions! Before posting your first PR, please see our [contributing guidelines](CONTRIBUTING.md) for
@@ -209,4 +214,7 @@ poetry run pytest
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is primarily licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Parts of this project (specifically the Schema Registry mock implementation) contain code from Confluent Inc., 
+licensed under the Apache License, Version 2.0. See [LICENSE.APACHE](LICENSE.APACHE) for details.
