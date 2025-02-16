@@ -55,15 +55,15 @@ class KafkaSimulator:
         self.one_ack_delay = ONE_ACK_DELAY
         self.all_ack_delay = ALL_ACK_DELAY
         self.topics: list[KTopic] = [KTopic.from_env(topic) for topic in TOPICS]
-        self.topics.append(KTopic("_schemas"))  #  Built-in `_schemas` topic
-        self.topics.append(KTopic("__consumer_offsets"))  #  Built-in `__consumer_offsets` topic
+        self.topics.append(KTopic("_schemas"))  # Built-in `_schemas` topic
+        self.topics.append(KTopic("__consumer_offsets"))  # Built-in `__consumer_offsets` topic
         self._registered_transact_ids: dict[str, list[int]] = defaultdict(list)  # Producer's epoch = list length
 
         self.producers_handler = self.handle_producers()
         self.producers_handler.send(KSignals.INIT.value)
 
-        logger.info(f"Kafka Simulator initialized")
-        logger.debug(f"Registered topics: {self.topics}")
+        logger.info("Kafka Simulator initialized, id: %s", id(self))
+        logger.debug("Registered topics: %s", self.topics)
 
     def _topics_2_cluster_metadata(self, topics: Optional[list[KTopic]] = None) -> ClusterMetadata:
         """Converts KTopics into ClusterMetadata (stubbed)."""
@@ -131,7 +131,7 @@ class KafkaSimulator:
         handler = self.producers_handler
         if getgeneratorstate(handler) != GEN_SUSPENDED:
             raise KafkaSimulatorProcessingException(
-                f"Potential bug: producers handler should be suspended at this point... {getgeneratorstate(handler)}"
+                "Potential bug: producers handler should be suspended at this point... %s", getgeneratorstate(handler)
             )
 
         producer_epoch = len(self._registered_transact_ids[transactional_id]) - 1

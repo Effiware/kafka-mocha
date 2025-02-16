@@ -17,9 +17,6 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.12"
 Jinja2 = "^3.1.5"
-httpx = "^0.28.1"
-cachetools = "^5.5.1"
-fastavro = "^1.10.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.3"
@@ -28,6 +25,9 @@ pytest-cov = "^6.0.0"
 isort = "^5.13.2"
 black = {extras = ["d"], version = "^25.1.0"}
 confluent-kafka = "^2.0.0"
+httpx = "^0.28.1"
+cachetools = "^5.5.1"
+fastavro = "^1.10.0"
 
 [build-system]
 requires = ["poetry-core"]

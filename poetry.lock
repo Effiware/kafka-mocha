@@ -41,7 +41,7 @@ frozenlist = ">=1.1.0"
 name = "anyio"
 version = "4.8.0"
 description = "High level compatibility layer for multiple asynchronous event loop implementations"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.9"
 
@@ -97,7 +97,7 @@ uvloop = ["uvloop (>=0.15.2)"]
 name = "cachetools"
 version = "5.5.1"
 description = "Extensible memoizing collections and decorators"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.7"
 
@@ -105,7 +105,7 @@ python-versions = ">=3.7"
 name = "certifi"
 version = "2025.1.31"
 description = "Python package for providing Mozilla's CA Bundle."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -164,7 +164,7 @@ toml = ["tomli"]
 name = "fastavro"
 version = "1.10.0"
 description = "Fast read/write of AVRO files"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.9"
 
@@ -186,7 +186,7 @@ python-versions = ">=3.8"
 name = "h11"
 version = "0.14.0"
 description = "A pure-Python, bring-your-own-I/O implementation of HTTP/1.1"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.7"
 
@@ -194,7 +194,7 @@ python-versions = ">=3.7"
 name = "httpcore"
 version = "1.0.7"
 description = "A minimal low-level HTTP client."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.8"
 
@@ -212,7 +212,7 @@ trio = ["trio (>=0.22.0,<1.0)"]
 name = "httpx"
 version = "0.28.1"
 description = "The next generation HTTP client."
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.8"
 
@@ -233,7 +233,7 @@ zstd = ["zstandard (>=0.18.0)"]
 name = "idna"
 version = "3.10"
 description = "Internationalized Domain Names in Applications (IDNA)"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -396,7 +396,7 @@ testing = ["covdefaults (>=2.3)", "coverage (>=7.6.1)", "pytest-mock (>=3.14)"]
 name = "sniffio"
 version = "1.3.1"
 description = "Sniff out which async library your code is running under"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.7"
 
@@ -404,7 +404,7 @@ python-versions = ">=3.7"
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.8"
 
@@ -424,7 +424,7 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.12"
-content-hash = "338b86da2df956b872a604046a2416cb7525d71cc42e0f58036824aa7467b027"
+content-hash = "d6d10b5ce98fa32f1e7a161d77f04f1a4fefbb84550086537509de78052a9ba1"
 
 [metadata.files]
 aiohappyeyeballs = [

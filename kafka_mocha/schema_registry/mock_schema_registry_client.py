@@ -16,9 +16,10 @@
 # limitations under the License.
 #
 
+import json
 from collections import defaultdict
 from threading import Lock
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.schema_registry.schema_registry_client import RegisteredSchema, Schema, _BaseRestClient
@@ -57,8 +58,22 @@ class _SchemaStore(object):
         with self.lock:
             if subject_name in self.subject_schemas:
                 for rs in self.subject_schemas[subject_name]:
-                    if rs.schema == schema:
+                    # if rs.schema == schema:  # For some reason, this comparison is not working
+                    #     return rs
+                    if (
+                        rs.schema.schema_str == schema.schema_str
+                        and rs.schema.schema_type == schema.schema_type
+                        and rs.schema.references == schema.references
+                        and rs.schema.metadata == schema.metadata
+                        and rs.schema.rule_set == schema.rule_set
+                    ):
                         return rs
+            return None
+
+    def get_latest_registered_schema_by_subject(self, subject_name: str) -> Optional[RegisteredSchema]:
+        with self.lock:
+            if subject_name in self.subject_schemas:
+                return list(self.subject_schemas[subject_name])[-1]
             return None
 
     def get_version(self, subject_name: str, version: int) -> Optional[RegisteredSchema]:
@@ -132,23 +147,56 @@ class _SchemaStore(object):
 
 
 class MockSchemaRegistryClient(_BaseRestClient):
-
     _instance = None
     _lock = Lock()
 
-    def __new__(cls, conf: dict):
+    def __new__(
+        cls,
+        conf: dict,
+        register_schemas: Optional[list[str]] = None,
+        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
+    ):
         if not cls._instance:
             with cls._lock:
                 if not cls._instance:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, conf: dict):
-        log_level = conf.pop("log_level", "DEBUG")
+    def __init__(
+        self,
+        conf: dict,
+        register_schemas: Optional[list[str]] = None,
+        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
+    ):
         super().__init__(conf)
         self._store = _SchemaStore()
-        self.logger = get_custom_logger(log_level) # noqa F821
+        self.logger = get_custom_logger(loglevel)  # noqa F821
+        if register_schemas:
+            self._register_schemas(register_schemas)
+
         self.logger.debug("Mock Schema Registry Client initialized.")
+
+    def _register_schemas(self, register_schemas: list[str]) -> None:
+        if isinstance(register_schemas, list):
+            for schema in register_schemas:
+                file_name = schema.split("/")[-1]
+                extension = file_name.split(".")[-1]
+                if extension == "avsc":
+                    schema_type = "AVRO"
+                elif extension == "json":
+                    schema_type = "JSON"
+                else:
+                    raise SchemaRegistryError(
+                        400, 40002, "Unsupported schema file format, only AVRO and JSON are supported."
+                    )
+                with open(schema, "r") as f:
+                    avro_schema = json.loads(f.read())
+                    avro_schema_str = json.dumps(avro_schema)
+                    self.register_schema(
+                        file_name + "-value", Schema(schema_str=avro_schema_str, schema_type=schema_type)
+                    )
+        else:
+            raise SchemaRegistryError(400, 40001, "Invalid schema file list format.")
 
     def register_schema(self, subject_name: str, schema: "Schema", normalize_schemas: bool = False) -> int:
         self.logger.debug("Registering schema for subject: %s and schema: %s", subject_name, schema)
@@ -191,7 +239,7 @@ class MockSchemaRegistryClient(_BaseRestClient):
         raise SchemaRegistryError(404, 40400, "Schema Not Found")
 
     def get_subjects(self) -> List[str]:
-        self.logger.info("Retrieving all registered subjects",)
+        self.logger.info("Retrieving all registered subjects")
         return self._store.get_subjects()
 
     def delete_subject(self, subject_name: str, permanent: bool = False) -> List[int]:

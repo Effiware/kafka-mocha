@@ -22,7 +22,6 @@ from urllib.parse import unquote, urlparse
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-from confluent_kafka.schema_registry import Metadata
 
 T = TypeVar("T")
 VALID_AUTH_PROVIDERS = ["URL", "USER_INFO"]
@@ -534,7 +533,7 @@ class SchemaReference:
         return schema_reference
 
 
-@_attrs_define(frozen=True, cache_hash=True)
+@_attrs_define(frozen=True, cache_hash=True, eq=True)
 class Schema:
     """
     An unregistered schema.
@@ -621,6 +620,11 @@ class Schema:
         )
 
         return schema
+
+    # def __eq__(self, other):
+    #     if not isinstance(other, Schema):
+    #         return False
+    #     return self.to_dict() == other.to_dict()
 
 
 @_attrs_define(frozen=True, cache_hash=True)

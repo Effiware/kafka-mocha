@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="timestamp" content="2025-02-11T10:38:44 + 01:00">
+    <meta name="timestamp" content="2025-02-16T21:17:09 + 01:00">
     <meta name="os" content="Darwin">
     <title>kafka_mocha</title>
     <link rel="icon" href="https://effiware.com/favicon.ico">
@@ -113,18 +113,10 @@
              style="width: 170px; height: auto; margin-top: 10px;">
     </a>
     <h1>Embedded Kafka - message dump</h1>
-    <p>Generated at: 2025-02-11T10:38:44 + 01:00</p>
+    <p>Generated at: 2025-02-16T21:17:09 + 01:00</p>
     <div class="tabs" id="tabs">
         
-            <div class="tab" onclick="showTopic('__consumer_offsets')">__consumer_offsets</div>
-        
-            <div class="tab" onclick="showTopic('__transaction_state')">__transaction_state</div>
-        
-            <div class="tab" onclick="showTopic('_schemas')">_schemas</div>
-        
-            <div class="tab" onclick="showTopic('test-topic-transact-1')">test-topic-transact-1</div>
-        
-            <div class="tab" onclick="showTopic('test-topic-transact-2')">test-topic-transact-2</div>
+            <div class="tab" onclick="showTopic('test-topic')">test-topic</div>
         
     </div>
     <div class="search-bar">
@@ -143,7 +135,7 @@
     </div>
     <div class="table-container">
         
-            <table id="table-test-topic-transact-1" class="messagesTable" style="display: none;">
+            <table id="table-test-topic" class="messagesTable" style="display: none;">
                 <thead>
                 <tr>
                     <th>Timestamp</th>
@@ -157,130 +149,30 @@
                 <tbody>
                 
                     <tr>
-                        <td>1739266723792</td>
+                        <td>1739737023297</td>
                         <td>0</td>
                         <td>1000</td>
-                        <td>b'4310550528'</td>
-                        <td>b'2025-02-11T10:38:43.793165'</td>
+                        <td>b'4334597760'</td>
+                        <td>b'2025-02-16T21:17:03.198983'</td>
                         <td>()</td>
                     </tr>
                 
                     <tr>
-                        <td>1739266723792</td>
-                        <td>2</td>
-                        <td>1000</td>
-                        <td>b'4310550538'</td>
-                        <td>b'2025-02-11T10:38:43.793251'</td>
-                        <td>()</td>
-                    </tr>
-                
-                </tbody>
-            </table>
-        
-            <table id="table-test-topic-transact-2" class="messagesTable" style="display: none;">
-                <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Partition</th>
-                    <th>Offset</th>
-                    <th>Key</th>
-                    <th>Value</th>
-                    <th>Headers</th>
-                </tr>
-                </thead>
-                <tbody>
-                
-                    <tr>
-                        <td>1739266723792</td>
+                        <td>1739737026797</td>
                         <td>0</td>
-                        <td>1000</td>
-                        <td>b'4310550528'</td>
-                        <td>b'2025-02-11T10:38:43.793275'</td>
-                        <td>()</td>
-                    </tr>
-                
-                </tbody>
-            </table>
-        
-            <table id="table-_schemas" class="messagesTable" style="display: none;">
-                <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Partition</th>
-                    <th>Offset</th>
-                    <th>Key</th>
-                    <th>Value</th>
-                    <th>Headers</th>
-                </tr>
-                </thead>
-                <tbody>
-                
-                </tbody>
-            </table>
-        
-            <table id="table-__consumer_offsets" class="messagesTable" style="display: none;">
-                <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Partition</th>
-                    <th>Offset</th>
-                    <th>Key</th>
-                    <th>Value</th>
-                    <th>Headers</th>
-                </tr>
-                </thead>
-                <tbody>
-                
-                </tbody>
-            </table>
-        
-            <table id="table-__transaction_state" class="messagesTable" style="display: none;">
-                <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Partition</th>
-                    <th>Offset</th>
-                    <th>Key</th>
-                    <th>Value</th>
-                    <th>Headers</th>
-                </tr>
-                </thead>
-                <tbody>
-                
-                    <tr>
-                        <td>-1</td>
-                        <td>42</td>
-                        <td>1003</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'version': 0}"</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'producerId': 4310550528, 'lastProducerId': -1, 'producerEpoch': 0, 'lastProducerEpoch': -1, 'txnTimeoutMs': 60000, 'state': 'CompleteCommit', 'topicPartitions': [], 'txnStartTimestamp': -1, 'txnLastUpdateTimestamp': -1}"</td>
-                        <td>None</td>
-                    </tr>
-                
-                    <tr>
-                        <td>-1</td>
-                        <td>42</td>
-                        <td>1000</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'version': 0}"</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'producerId': 4310550528, 'lastProducerId': -1, 'producerEpoch': 0, 'lastProducerEpoch': -1, 'txnTimeoutMs': 60000, 'state': 'Empty', 'topicPartitions': [], 'txnStartTimestamp': -1, 'txnLastUpdateTimestamp': -1}"</td>
-                        <td>None</td>
-                    </tr>
-                
-                    <tr>
-                        <td>-1</td>
-                        <td>42</td>
-                        <td>1002</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'version': 0}"</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'producerId': 4310550528, 'lastProducerId': -1, 'producerEpoch': 0, 'lastProducerEpoch': -1, 'txnTimeoutMs': 60000, 'state': 'PrepareCommit', 'topicPartitions': [], 'txnStartTimestamp': -1, 'txnLastUpdateTimestamp': -1}"</td>
-                        <td>None</td>
-                    </tr>
-                
-                    <tr>
-                        <td>-1</td>
-                        <td>42</td>
                         <td>1001</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'version': 0}"</td>
-                        <td>b"{'transactionalId': 'test-multiple', 'producerId': 4310550528, 'lastProducerId': -1, 'producerEpoch': 0, 'lastProducerEpoch': -1, 'txnTimeoutMs': 60000, 'state': 'Ongoing', 'topicPartitions': [], 'txnStartTimestamp': -1, 'txnLastUpdateTimestamp': -1}"</td>
-                        <td>None</td>
+                        <td>b'4334597760'</td>
+                        <td>b'2025-02-16T21:17:06.199862'</td>
+                        <td>()</td>
+                    </tr>
+                
+                    <tr>
+                        <td>1739737030297</td>
+                        <td>0</td>
+                        <td>1002</td>
+                        <td>b'4334597760'</td>
+                        <td>b'2025-02-16T21:17:09.200235'</td>
+                        <td>()</td>
                     </tr>
                 
                 </tbody>
@@ -309,7 +201,7 @@
 <script>
     var currentPage = 1;
     var rowsPerPage = 10;
-    var currentTopic = "test-topic-transact-1";
+    var currentTopic = "test-topic";
 
     function displayTablePage(page) {
         var table, tr, i;
