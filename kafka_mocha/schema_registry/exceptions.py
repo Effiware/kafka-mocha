@@ -16,6 +16,7 @@
 # limitations under the License.
 #
 
+
 class SchemaRegistryError(Exception):
     """
     Represents an error returned by the Confluent Schema Registry
@@ -32,6 +33,7 @@ class SchemaRegistryError(Exception):
         `API Error Reference <https://docs.confluent.io/current/schema-registry/develop/api.html#errors>`_
 
     """  # noqa: E501
+
     UNKNOWN = -1
 
     def __init__(self, http_status_code: int, error_code: int, error_message: str):
@@ -43,6 +45,4 @@ class SchemaRegistryError(Exception):
         return str(self)
 
     def __str__(self):
-        return "{} (HTTP status code {}, SR code {})".format(self.error_message,
-                                                             self.http_status_code,
-                                                             self.error_code)
+        return "{} (HTTP status code {}, SR code {})".format(self.error_message, self.http_status_code, self.error_code)

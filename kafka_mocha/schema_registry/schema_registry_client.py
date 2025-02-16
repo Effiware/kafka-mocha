@@ -17,16 +17,15 @@
 #
 
 from enum import Enum
-from typing import Optional, List, Dict, Any, Type, cast, TypeVar, Union, Tuple
-from urllib.parse import urlparse, unquote
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
+from urllib.parse import unquote, urlparse
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
 from confluent_kafka.schema_registry import Metadata
 
 T = TypeVar("T")
-VALID_AUTH_PROVIDERS = ['URL', 'USER_INFO']
+VALID_AUTH_PROVIDERS = ["URL", "USER_INFO"]
 
 
 class RuleKind(str, Enum):
@@ -68,15 +67,15 @@ class _BaseRestClient(object):
         # copy dict to avoid mutating the original
         conf_copy = conf.copy()
 
-        base_url = conf_copy.pop('url', None)
+        base_url = conf_copy.pop("url", None)
         if base_url is None:
             raise ValueError("Missing required configuration property url")
         if not isinstance(base_url, str):
             raise TypeError("url must be a str, not " + str(type(base_url)))
         base_urls = []
-        for url in base_url.split(','):
-            url = url.strip().rstrip('/')
-            if not url.startswith('http') and not url.startswith('mock'):
+        for url in base_url.split(","):
+            url = url.strip().rstrip("/")
+            if not url.startswith("http") and not url.startswith("mock"):
                 raise ValueError("Invalid url {}".format(url))
             base_urls.append(url)
         if not base_urls:
@@ -84,12 +83,12 @@ class _BaseRestClient(object):
         self.base_urls = base_urls
 
         self.verify = True
-        ca = conf_copy.pop('ssl.ca.location', None)
+        ca = conf_copy.pop("ssl.ca.location", None)
         if ca is not None:
             self.verify = ca
 
-        key: Optional[str] = conf_copy.pop('ssl.key.location', None)
-        client_cert: Optional[str] = conf_copy.pop('ssl.certificate.location', None)
+        key: Optional[str] = conf_copy.pop("ssl.key.location", None)
+        client_cert: Optional[str] = conf_copy.pop("ssl.certificate.location", None)
         self.cert: Union[str, Tuple[str, str], None] = None
 
         if client_cert is not None and key is not None:
@@ -99,83 +98,80 @@ class _BaseRestClient(object):
             self.cert = client_cert
 
         if key is not None and client_cert is None:
-            raise ValueError("ssl.certificate.location required when"
-                             " configuring ssl.key.location")
+            raise ValueError("ssl.certificate.location required when" " configuring ssl.key.location")
 
         parsed = urlparse(self.base_urls[0])
         try:
             userinfo = (unquote(parsed.username), unquote(parsed.password))
         except (AttributeError, TypeError):
             userinfo = ("", "")
-        if 'basic.auth.user.info' in conf_copy:
-            if userinfo != ('', ''):
-                raise ValueError("basic.auth.user.info configured with"
-                                 " userinfo credentials in the URL."
-                                 " Remove userinfo credentials from the url or"
-                                 " remove basic.auth.user.info from the"
-                                 " configuration")
+        if "basic.auth.user.info" in conf_copy:
+            if userinfo != ("", ""):
+                raise ValueError(
+                    "basic.auth.user.info configured with"
+                    " userinfo credentials in the URL."
+                    " Remove userinfo credentials from the url or"
+                    " remove basic.auth.user.info from the"
+                    " configuration"
+                )
 
-            userinfo = tuple(conf_copy.pop('basic.auth.user.info', '').split(':', 1))
+            userinfo = tuple(conf_copy.pop("basic.auth.user.info", "").split(":", 1))
 
             if len(userinfo) != 2:
-                raise ValueError("basic.auth.user.info must be in the form"
-                                 " of {username}:{password}")
+                raise ValueError("basic.auth.user.info must be in the form" " of {username}:{password}")
 
-        self.auth = userinfo if userinfo != ('', '') else None
+        self.auth = userinfo if userinfo != ("", "") else None
 
         # The following adds support for proxy config
         # If specified: it uses the specified proxy details when making requests
         self.proxy = None
-        proxy = conf_copy.pop('proxy', None)
+        proxy = conf_copy.pop("proxy", None)
         if proxy is not None:
             self.proxy = proxy
 
         self.timeout = None
-        timeout = conf_copy.pop('timeout', None)
+        timeout = conf_copy.pop("timeout", None)
         if timeout is not None:
             self.timeout = timeout
 
         self.cache_capacity = 1000
-        cache_capacity = conf_copy.pop('cache.capacity', None)
+        cache_capacity = conf_copy.pop("cache.capacity", None)
         if cache_capacity is not None:
             if not isinstance(cache_capacity, (int, float)):
                 raise TypeError("cache.capacity must be a number, not " + str(type(cache_capacity)))
             self.cache_capacity = cache_capacity
 
         self.cache_latest_ttl_sec = None
-        cache_latest_ttl_sec = conf_copy.pop('cache.latest.ttl.sec', None)
+        cache_latest_ttl_sec = conf_copy.pop("cache.latest.ttl.sec", None)
         if cache_latest_ttl_sec is not None:
             if not isinstance(cache_latest_ttl_sec, (int, float)):
                 raise TypeError("cache.latest.ttl.sec must be a number, not " + str(type(cache_latest_ttl_sec)))
             self.cache_latest_ttl_sec = cache_latest_ttl_sec
 
         self.max_retries = 3
-        max_retries = conf_copy.pop('max.retries', None)
+        max_retries = conf_copy.pop("max.retries", None)
         if max_retries is not None:
             if not isinstance(timeout, (int, float)):
                 raise TypeError("max.retries must be a number, not " + str(type(max_retries)))
             self.max_retries = max_retries
 
         self.retries_wait_ms = 1000
-        retries_wait_ms = conf_copy.pop('retries.wait.ms', None)
+        retries_wait_ms = conf_copy.pop("retries.wait.ms", None)
         if retries_wait_ms is not None:
             if not isinstance(retries_wait_ms, (int, float)):
-                raise TypeError("retries.wait.ms must be a number, not "
-                                + str(type(retries_wait_ms)))
+                raise TypeError("retries.wait.ms must be a number, not " + str(type(retries_wait_ms)))
             self.retries_wait_ms = retries_wait_ms
 
         self.retries_max_wait_ms = 20000
-        retries_max_wait_ms = conf_copy.pop('retries.max.wait.ms', None)
+        retries_max_wait_ms = conf_copy.pop("retries.max.wait.ms", None)
         if retries_max_wait_ms is not None:
             if not isinstance(retries_max_wait_ms, (int, float)):
-                raise TypeError("retries.max.wait.ms must be a number, not "
-                                + str(type(retries_max_wait_ms)))
+                raise TypeError("retries.max.wait.ms must be a number, not " + str(type(retries_max_wait_ms)))
             self.retries_max_wait_ms = retries_max_wait_ms
 
         # Any leftover keys are unknown to _RestClient
         if len(conf_copy) > 0:
-            raise ValueError("Unrecognized properties: {}"
-                             .format(", ".join(conf_copy.keys())))
+            raise ValueError("Unrecognized properties: {}".format(", ".join(conf_copy.keys())))
 
     def get(self, url: str, query: dict = None) -> Any:
         raise NotImplementedError()

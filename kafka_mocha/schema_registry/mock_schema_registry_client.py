@@ -18,10 +18,11 @@
 
 from collections import defaultdict
 from threading import Lock
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.schema_registry.schema_registry_client import RegisteredSchema, Schema, _BaseRestClient
+from kafka_mocha.schema_registry.srlogger import get_custom_logger
 
 
 class _SchemaStore(object):
@@ -132,17 +133,32 @@ class _SchemaStore(object):
 
 class MockSchemaRegistryClient(_BaseRestClient):
 
+    _instance = None
+    _lock = Lock()
+
+    def __new__(cls, conf: dict):
+        if not cls._instance:
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self, conf: dict):
+        log_level = conf.pop("log_level", "DEBUG")
         super().__init__(conf)
         self._store = _SchemaStore()
+        self.logger = get_custom_logger(log_level) # noqa F821
+        self.logger.debug("Mock Schema Registry Client initialized.")
 
     def register_schema(self, subject_name: str, schema: "Schema", normalize_schemas: bool = False) -> int:
+        self.logger.debug("Registering schema for subject: %s and schema: %s", subject_name, schema)
         registered_schema = self.register_schema_full_response(subject_name, schema, normalize_schemas)
         return registered_schema.schema_id
 
     def register_schema_full_response(
         self, subject_name: str, schema: "Schema", normalize_schemas: bool = False
     ) -> "RegisteredSchema":
+        self.logger.debug("Registering schema (full response) for subject: %s and schema: %s", subject_name, schema)
         registered_schema = self._store.get_registered_schema_by_schema(subject_name, schema)
         if registered_schema is not None:
             return registered_schema
@@ -157,6 +173,7 @@ class MockSchemaRegistryClient(_BaseRestClient):
         return registered_schema
 
     def get_schema(self, schema_id: int, subject_name: str = None, fmt: str = None) -> "Schema":
+        self.logger.debug("Getting schema for schema_id: %d", schema_id)
         schema = self._store.get_schema(schema_id)
         if schema is not None:
             return schema
@@ -166,7 +183,7 @@ class MockSchemaRegistryClient(_BaseRestClient):
     def lookup_schema(
         self, subject_name: str, schema: "Schema", normalize_schemas: bool = False, deleted: bool = False
     ) -> "RegisteredSchema":
-
+        self.logger.debug("Looking up schema for subject: %s and schema: %s", subject_name, schema)
         registered_schema = self._store.get_registered_schema_by_schema(subject_name, schema)
         if registered_schema is not None:
             return registered_schema
@@ -174,12 +191,15 @@ class MockSchemaRegistryClient(_BaseRestClient):
         raise SchemaRegistryError(404, 40400, "Schema Not Found")
 
     def get_subjects(self) -> List[str]:
+        self.logger.info("Retrieving all registered subjects",)
         return self._store.get_subjects()
 
     def delete_subject(self, subject_name: str, permanent: bool = False) -> List[int]:
+        self.logger.info("Deleting for subject: %s", subject_name)
         return self._store.remove_by_subject(subject_name)
 
     def get_latest_version(self, subject_name: str, fmt: str = None) -> "RegisteredSchema":
+        self.logger.debug("Getting latest schema version for subject: %s", subject_name)
         registered_schema = self._store.get_latest_version(subject_name)
         if registered_schema is not None:
             return registered_schema
@@ -189,6 +209,7 @@ class MockSchemaRegistryClient(_BaseRestClient):
     def get_latest_with_metadata(
         self, subject_name: str, metadata: Dict[str, str], deleted: bool = False, fmt: str = None
     ) -> "RegisteredSchema":
+        self.logger.debug("Getting latest schema metadata for subject: %s and version: %s", subject_name, metadata)
         registered_schema = self._store.get_latest_with_metadata(subject_name, metadata)
         if registered_schema is not None:
             return registered_schema
@@ -199,17 +220,20 @@ class MockSchemaRegistryClient(_BaseRestClient):
         self, subject_name: str, version: int, deleted: bool = False, fmt: str = None
     ) -> "RegisteredSchema":
         registered_schema = self._store.get_version(subject_name, version)
+        self.logger.debug("Getting schema version for subject: %s and version: %d", subject_name, version)
         if registered_schema is not None:
             return registered_schema
 
         raise SchemaRegistryError(404, 40400, "Schema Not Found")
 
     def get_versions(self, subject_name: str) -> List[int]:
+        self.logger.debug("Getting versions for subject: %s", subject_name)
         return self._store.get_versions(subject_name)
 
     def delete_version(self, subject_name: str, version: int, permanent: bool = False) -> int:
         registered_schema = self._store.get_version(subject_name, version)
         if registered_schema is not None:
+            self.logger.info("Deleting version: %d for subject: %s", version, subject_name)
             self._store.remove_by_schema(registered_schema)
             return registered_schema.schema_id
 
@@ -218,7 +242,12 @@ class MockSchemaRegistryClient(_BaseRestClient):
     def set_config(
         self, subject_name: Optional[str] = None, config: "ServerConfig" = None  # noqa F821
     ) -> "ServerConfig":  # noqa F821
+        self.logger.warning("Mock Schema Registry Client does not support configuration.")
         return None
 
     def get_config(self, subject_name: Optional[str] = None) -> "ServerConfig":  # noqa F821
+        self.logger.warning("Mock Schema Registry Client does not support configuration.")
         return None
+
+    def __del__(self):
+        self.logger.debug("Mock Schema Registry Client has been terminated.")

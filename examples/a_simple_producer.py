@@ -3,7 +3,7 @@ from datetime import datetime
 
 import confluent_kafka
 
-from examples.confexmp import handle_produce
+from examples._confexmp import handle_produce
 from kafka_mocha import mock_producer
 
 TOPIC_NAME = "test-topic"
