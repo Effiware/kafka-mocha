@@ -27,7 +27,7 @@ def get_custom_logger(
     """Initializes (if not already done) and returns a custom logger."""
     logger = logging.getLogger(name)
     stream_handler = logging.StreamHandler()
-    stream_handler.setFormatter(logging.Formatter("(levelname)-8s %(module)-15s > %(message)s"))
+    stream_handler.setFormatter(logging.Formatter("%(levelname)-8s %(module)-15s > %(message)s"))
 
     if not logger.hasHandlers():
         logger.addHandler(stream_handler)

@@ -4,7 +4,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - License](https://img.shields.io/pypi/l/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
-[![PyPI - Coverage](https://img.shields.io/badge/coverage-91%25-gree)](https://pypi.org/project/kafka-mocha/)
+[![PyPI - Coverage](https://img.shields.io/badge/coverage-92%25-gree)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - Wheel](https://img.shields.io/pypi/wheel/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 [![PyPI - Implementation](https://img.shields.io/pypi/implementation/kafka_mocha)](https://pypi.org/project/kafka-mocha/)
 
@@ -32,6 +32,9 @@ The main component of this project is a process called `KafkaSimulator` which si
 Cluster, within the bounds of implementation limitations. The current version includes a `KProducer` class that acts as
 a mock for the `Producer` from the `confluent_kafka` package. A `KConsumer` class is still under development.
 
+Additionally, the project includes a `SchemaRegistryMock` class that acts as a mock for the `SchemaRegistryClient` from
+the `confluent_kafka` package.
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -40,6 +43,7 @@ a mock for the `Producer` from the `confluent_kafka` package. A `KConsumer` clas
     - [KProducer](#kproducer)
     - [KConsumer](#kconsumer)
     - [Schema Registry Mock](#schema-registry-mock)
+    - [Absolute imports](#absolute-imports)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -83,25 +87,29 @@ poetry add kafka_mocha --allow-prereleases
 ### Starting Kafka Simulator
 
 Kafka Simulator is automatically ran whenever any instance of either `KProdcer` or `KConsumer` is created (e.g. via
-`mock_producer`,
-`mock_consumer`). So there is no need to manually start it.
+`mock_producer`, `mock_consumer`). So there is no need to manually start it.
 
 Upon default logging settings a custom start-up messages might be visible:
 
 ```text
-INFO     kafka_simulator > Kafka Simulator initialized
-INFO     ticking_thread  > Buffer for KProducer(4368687344): ticking initialized
-INFO     buffer_handler  > Buffer for KProducer(4368687344) has been primed, size: 300, timeout: 2
-INFO     kafka_simulator > Kafka Simulator initialized
+INFO     ticking_thread  > Buffer for KProducer(4409519920): ticking initialized
+INFO     buffer_handler  > Buffer for KProducer(4409519920) has been primed, length: 5, timeout: 300
 INFO     kafka_simulator > Handle producers has been primed
-INFO     kafka_simulator > Kafka Simulator initialized
-INFO     ticking_thread  > Buffer for KProducer(4368687344): ticking started
+INFO     kafka_simulator > Kafka Simulator initialized, id: 4399382400
+DEBUG    kafka_simulator > Registered topics: [KTopic(name='_schemas', partition_no=1, config=None), KTopic(name='__consumer_offsets', partition_no=1, config=None)]
+INFO     ticking_thread  > Buffer for KProducer(4409519920): ticking started
+DEBUG    kproducer       > KProducer(4409519920): received ack: BUFFERED
+DEBUG    buffer_handler  > Buffer for KProducer(4409519920): received done (or manual flush) signal...
+DEBUG    kafka_simulator > Appended message: (partition=0, offset=1000, key=b'4df33f7a-fcee-4b3b-b176-a4e650540401', value=b'\x00\x00\x00\x00\x01H4df33f7a-fcee-4b3b-b176-a4e650540401\x08John\x06Doe\x01\x04\xbe\xfd\x83\x8b\xa2e\x00\x00\x00\x00\x00\x00\x00\x00He5df0ed3-765c-4f58-b18c-aea4400dfce4\xbe\xfd\x83\x8b\xa2e(kafka_mocha_examples\n1.0.0', headers=[]))
+INFO     buffer_handler  > Buffer for KProducer(4409519920): Kafka response: SUCCESS
+INFO     ticking_thread  > Buffer for KProducer(4409519920): stop event
+DEBUG    buffer_handler  > Buffer for KProducer(4409519920): received done (or manual flush) signal...
+INFO     buffer_handler  > Buffer for KProducer(4409519920): nothing to send...
 ```
 
 Additionally, all the messages produced by the `KProducer` instances are stored in the `KafkaSimulator` instance. The
-messages can be
-dropped to either HTML or CSV file by passing `output` parameter, see `KProucer` and [outputs](./examples/outputs) for
-more details.
+messages can be dropped to either HTML or CSV file by passing `output` parameter, see `KProucer`
+and [outputs](./examples/outputs) for more details.
 
 ### KProducer
 
@@ -122,6 +130,7 @@ def handle_produce():
 ```
 
 The `KProducer` class replicates the interface and behavior of the `Producer` class from the `confluent_kafka` library.
+For more examples, see the [examples](./examples) directory.
 
 <details>
 <summary>Parameters for mock_producer</summary>
@@ -155,7 +164,67 @@ from the `confluent_kafka` library.
 
 ### Schema Registry Mock
 
-TODO
+The Schema Registry mock is a part of the `kafla_mocha` package. It is heavily inspired by
+the [confluent-kafka-python/mock_schema_registry_client](https://github.com/confluentinc/confluent-kafka-python/blob/master/src/confluent_kafka/schema_registry/mock_schema_registry_client.py)
+implementation and hence is lincensed under the Apache License, Version 2.0.
+
+It provides fully compatible implementation of the `SchemaRegistryClient` class from the `confluent_kafka` library and
+similarly to the `KProducer` class, it can be used as a decorator:
+
+```python
+import confluent_kafka.schema_registry
+from confluent_kafka.schema_registry.avro import AvroSerializer
+from confluent_kafka.serialization import SerializationContext, MessageField
+
+from kafka_mocha.schema_registry import mock_schema_registry
+
+
+@mock_schema_registry()
+def quick_start():
+    schema_registry = confluent_kafka.schema_registry.SchemaRegistryClient({"url": "http://localhost:8081"})
+    avro_serializer = AvroSerializer(schema_registry, conf={"auto.register.schemas": False})
+    avro_serializer({"foo": "bar"}, SerializationContext("topic", MessageField.VALUE))
+```
+
+For more examples, see the [examples](./examples) directory.
+
+<details>
+<summary>Parameters for mock_schema_registry</summary>
+
+| No | Parameter name   | Parameter type | Comment                                                                         |
+|----|------------------|----------------|---------------------------------------------------------------------------------|
+| 1  | loglevel         | Literal        | See available levels in `logging` library                                       |
+| 2  | register_schemas | list[str]      | List of schemas (as relative paths) to load into Schema Registry Mock on launch |
+| 3  |                  |                |                                                                                 |
+
+</details>
+
+## Absolute imports
+
+Due to specific nature of python imports, it is recommended (**and enforced**) to use absolute imports in your code.
+This is especially
+important when using `mock_producer` and `mock_consumer` decorators, as they are using patching mechanism from
+`unittest.mock` module.
+
+Imports that will work:
+
+```python
+import confluent_kafka
+import confluent_kafka.schema_registry
+
+producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})  # OK
+schema_registry = confluent_kafka.schema_registry.SchemaRegistryClient({"url": "http://localhost:8081"})  # OK
+```
+
+Imports that will not work:
+
+```python
+from confluent_kafka import Producer
+from confluent_kafka.schema_registry import SchemaRegistryClient
+
+producer = Producer({"bootstrap.servers": "localhost:9092"})  # Will not work
+schema_registry = SchemaRegistryClient({"url": "http://localhost:8081"})  # Will not work
+```
 
 ## Contributing
 
@@ -216,5 +285,5 @@ poetry run pytest
 
 This project is primarily licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Parts of this project (specifically the Schema Registry mock implementation) contain code from Confluent Inc., 
+Parts of this project (specifically the Schema Registry mock implementation) contain code from Confluent Inc.,
 licensed under the Apache License, Version 2.0. See [LICENSE.APACHE](LICENSE.APACHE) for details.
