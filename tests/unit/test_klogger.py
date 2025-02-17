@@ -39,3 +39,7 @@ def test_getting_custom_logger() -> None:
     assert _logger.level == 50
     assert _logger.name == "test_logger"
     assert _logger.hasHandlers() == True
+
+
+def test_jedrek_test() -> None:
+    assert 1 == 1
