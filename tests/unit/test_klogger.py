@@ -39,3 +39,10 @@ def test_getting_custom_logger() -> None:
     assert _logger.level == 50
     assert _logger.name == "test_logger"
     assert _logger.hasHandlers() == True
+
+def test_getting_custom_logger_with_default_values() -> None:
+    _logger = get_custom_logger()
+
+    assert _logger.level == 40
+    assert _logger.name == "kafka_mocha"
+    assert _logger.hasHandlers() == True
