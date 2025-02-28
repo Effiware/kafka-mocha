@@ -15,7 +15,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 Jinja2 = "^3.1.5"
 
 [tool.poetry.group.test.dependencies]
@@ -24,7 +24,7 @@ pytest-env = "^1.1.5"
 pytest-cov = "^6.0.0"
 isort = "^5.13.2"
 black = {extras = ["d"], version = "^25.1.0"}
-confluent-kafka = "^2.0.0"
+confluent-kafka = "^2.4.0, !=2.6.2, !=2.8.1"
 httpx = "^0.28.1"
 cachetools = "^5.5.1"
 fastavro = "^1.10.0"
@@ -37,4 +37,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 120
-target-version = ["py312"]
+target-version = ["py311"]
