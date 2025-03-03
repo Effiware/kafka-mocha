@@ -1,3 +1,5 @@
+import logging
+from collections.abc import Callable
 from random import choice as random_choice
 from typing import Any, Literal
 
@@ -14,6 +16,11 @@ from kafka_mocha.utils import (
     validate_producer_config,
 )
 
+
+def raise_err_from_cb(err):
+    raise Exception(err)
+
+
 valid_common_string_fields = {
     "builtin.features": "gzip",
     "client.id": "test-client",
@@ -24,6 +31,7 @@ valid_common_string_fields = {
     "broker.address.family": "any",
     "broker.version.fallback": "2.7.0",
     "security.protocol": "plaintext",
+    "error_cb": raise_err_from_cb,
 }
 
 
@@ -47,6 +55,15 @@ def valid_config_factory(config_type: Literal["common", "producer", "consumer"])
             valid_common_config.append((key, int((value["range"][0] + value["range"][1]) / 2)))
         elif value["type"] is bool:
             valid_common_config.append((key, random_choice([True, False])))
+        elif value["type"] is Callable:
+            if value["args"] == 1:
+                valid_common_config.append((key, lambda x: print(str(x))))
+            elif value["args"] == 2:
+                valid_common_config.append((key, lambda x, y: print(str(x) + " | " + str(y))))
+            elif value["args"] == 3:
+                valid_common_config.append((key, lambda x, y, z: print(str(x) + " | " + str(y) + " | " + str(z))))
+            else:
+                raise ValueError(f"Exceeded number of arguments (3) for callback: {key}")
         else:
             raise ValueError(f"Invalid type: {value[type]}")
     return valid_common_config
@@ -72,12 +89,14 @@ def invalid_config_factory(config_type: Literal["common", "producer", "consumer"
             invalid_config.append((key, "test"))
         elif value["type"] is bool:
             invalid_config.append((key, 123))
+        elif value["type"] is Callable:
+            invalid_config.append((key, "callback_as_string"))
         else:
             raise ValueError(f"Invalid type: {value[type]}")
     return invalid_config
 
 
-@pytest.mark.parametrize("key, value", valid_config_factory("common"))
+@pytest.mark.parametrize("key, value", valid_config_factory("common") + [("logger", logging.getLogger("unit-test"))])
 def test_validate_common_config_happy_path(key: str, value: Any) -> None:
     """Test validate_common_config with valid configuration parameters."""
 
@@ -85,7 +104,7 @@ def test_validate_common_config_happy_path(key: str, value: Any) -> None:
     validate_common_config(config)
 
 
-@pytest.mark.parametrize("key, value", invalid_config_factory("common"))
+@pytest.mark.parametrize("key, value", invalid_config_factory("common") + [("log_cb", lambda x: print(str(x)))])
 def test_validate_common_config_unhappy_path(key: str, value: Any) -> None:
     """Test validate_common_config with invalid configuration parameters."""
 

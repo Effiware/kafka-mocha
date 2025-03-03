@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any, Literal
 
 from kafka_mocha.exceptions import KafkaClientBootstrapException
@@ -50,6 +51,10 @@ common_config_schema = {
     "retry.backoff.max.ms": {"type": int, "range": (1, 300000)},
     "client.dns.lookup": {"type": str, "allowed": ["use_all_dns_ips", "resolve_canonical_bootstrap_servers_only"]},
     "enable.metrics.push": {"type": bool, "allowed": [True, False]},
+    "error_cb": {"type": Callable, "args": 1},
+    "throttle_cb": {"type": Callable, "args": 1},
+    "stats_cb": {"type": Callable, "args": 1},
+    "oauth_cb": {"type": Callable, "args": 1},
 }
 producer_config_schema = {
     "transactional.id": {"type": str, "allowed": None},
@@ -107,9 +112,9 @@ consumer_config_schema = {
     "fetch.error.backoff.ms": {"type": int, "range": (0, 300000)},
     "offset.store.method": {"type": str, "allowed": ["none", "file", "broker"]},
     "isolation.level": {"type": str, "allowed": ["read_uncommitted", "read_committed"]},
-    "consume_cb": {"type": str, "allowed": None},  # Assuming type string for callback
-    "rebalance_cb": {"type": str, "allowed": None},  # Assuming type string for callback
-    "offset_commit_cb": {"type": str, "allowed": None},  # Assuming type string for callback
+    "consume_cb": {"type": Callable, "args": 1},
+    "rebalance_cb": {"type": Callable, "args": 2},
+    "offset_commit_cb": {"type": Callable, "args": 1},
     "enable.partition.eof": {"type": bool, "allowed": [True, False]},
     "check.crcs": {"type": bool, "allowed": [True, False]},
 }
@@ -151,6 +156,11 @@ def validate_common_config(config: dict[str, Any]) -> None:
 
     if "bootstrap.servers" not in config:
         raise KafkaClientBootstrapException("Configuration validation errors: bootstrap.servers is required")
+    if "log_cb" in config:
+        raise KafkaClientBootstrapException(
+            "In the Python client, the `logger` configuration property is used for log handler, not `log_cb`."
+        )
+    config.pop("logger", None)
 
     _validate_against_schema(common_config_schema, config)
 

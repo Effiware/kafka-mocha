@@ -120,7 +120,7 @@ def stale_transaction_fencing():
                 producer.begin_transaction()
                 producer.produce(TOPIC_NAME, datetime.now().isoformat(), str(self.run_id))
 
-                sleep(2) if self.run_id % 2 == 0 else None  # simulate a delay/crash for the first producer
+                sleep(1) if self.run_id % 2 == 0 else None  # simulate a delay/crash for the first producer
                 try:
                     producer.commit_transaction()
                 except confluent_kafka.KafkaException as e:

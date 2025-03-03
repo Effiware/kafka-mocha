@@ -61,4 +61,3 @@ class TestTransactionCoordinator:
     ) -> None:
         """Test that transaction coordinator can commit transaction."""
         kafka.transaction_coordinator(transaction_end, new_producer_id, transaction_id)  # noqa
-
