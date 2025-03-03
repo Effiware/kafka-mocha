@@ -4,7 +4,7 @@ from enum import Enum
 class Tick:
     DONE = -1
 
-    def __init__(self, interval_ms: int)  :
+    def __init__(self, interval_ms: int):
         if not isinstance(interval_ms, int) or interval_ms <= 0:
             raise ValueError("Tick interval must be an unsigned integer.")
         self.interval_ms = interval_ms

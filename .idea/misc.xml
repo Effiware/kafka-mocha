@@ -4,7 +4,7 @@
     <option name="pathToExecutable" value="/Library/Frameworks/Python.framework/Versions/3.12/bin/black" />
     <option name="sdkName" value="Poetry (kafka-mocha)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Poetry (kafka-mocha)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Poetry (kafka-mocha) (2)" project-jdk-type="Python SDK" />
   <component name="PyPackaging">
     <option name="earlyReleasesAsUpgrades" value="true" />
   </component>

@@ -1,5 +1,5 @@
 import logging
-from inspect import getgeneratorstate, GEN_SUSPENDED
+from inspect import GEN_SUSPENDED, getgeneratorstate
 
 from kafka_mocha.kproducer import KProducer
 from kafka_mocha.models import PMessage
@@ -27,3 +27,10 @@ def test_kproducer_warns_when_messages_left_in_buffer_on_termination(caplog) -> 
 
     with caplog.at_level(logging.WARNING):
         assert "You may have a bug: Producer terminating with 1 messages" in caplog.text, caplog.text
+
+
+def test_kproducer_implements_len(kproducer) -> None:
+    """Test that Kafka producer implements len dunder method."""
+    assert len(kproducer) == 0
+    kproducer.buffer.append(PMessage("test-topic", 0, b"key", b"value"))
+    assert len(kproducer) == 1
