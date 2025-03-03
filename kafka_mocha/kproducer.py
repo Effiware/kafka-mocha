@@ -4,8 +4,6 @@ from time import sleep, time
 from typing import Any, Literal, Optional
 
 from confluent_kafka import KafkaException, TopicPartition
-from confluent_kafka.error import KeySerializationError, ValueSerializationError
-from confluent_kafka.serialization import MessageField, SerializationContext
 
 from kafka_mocha.buffer_handler import buffer_handler
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
@@ -20,6 +18,13 @@ MAX_BUFFER_LEN = 2147483647
 
 
 class KProducer:
+    """
+    Confluent Kafka Producer mockup. It is used to simulate and fully imitate Kafka Producer behaviour. It is
+    implemented as a generator function that is controlled by a TickingThread (automatic message flush for given "time"
+    intervals). It is used to send messages to Kafka Simulator and can be safely used in integration tests or as an
+    emulator for Kafka Producer.
+    """
+
     def __init__(
         self,
         config: dict[str, Any],
@@ -30,8 +35,6 @@ class KProducer:
         self.config = config
         self.output = output
         self.logger = get_custom_logger(loglevel)
-        self._key_serializer = config.pop("key.serializer", None)  # TODO: delete
-        self._value_serializer = config.pop("value.serializer", None)  # TODO: delete
         self._transactional_id = config.get("transactional.id")
         self._max_retry_count = config.get("retries", config.get("message.send.max.retries", 6))
         self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
@@ -145,19 +148,6 @@ class KProducer:
 
         Instead of producing a real message to Kafka, it is sent to Kafka Simulator.
         """
-        ctx = SerializationContext(topic, MessageField.KEY, headers)
-        if self._key_serializer is not None:
-            try:
-                key = self._key_serializer(key, ctx)
-            except Exception as se:
-                raise KeySerializationError(se)
-        ctx.field = MessageField.VALUE
-        if self._value_serializer is not None:
-            try:
-                value = self._value_serializer(value, ctx)
-            except Exception as se:
-                raise ValueSerializationError(se)
-
         message = PMessage.from_producer_data(
             topic=topic,
             partition=partition,
@@ -236,6 +226,9 @@ class KProducer:
         self._ticking_thread.stop()
         self._ticking_thread.join()
         self._buffer_handler.close()
+
+    def __len__(self) -> int:
+        return len(self.buffer)
 
     def __del__(self):
         if hasattr(self, "config"):  # if __init__ was called without exceptions

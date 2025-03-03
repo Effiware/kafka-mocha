@@ -19,7 +19,7 @@
 import json
 from collections import defaultdict
 from threading import Lock
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Literal, Optional
 
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.schema_registry.schema_registry_client import RegisteredSchema, Schema, _BaseRestClient

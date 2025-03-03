@@ -5,6 +5,7 @@ from inspect import GEN_SUSPENDED, getgeneratorstate
 from threading import Lock
 from typing import Any, Literal, Optional
 
+from confluent_kafka import KafkaError, KafkaException
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
 from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaSimulatorProcessingException
@@ -157,9 +158,22 @@ class KafkaSimulator:
                 msg_value["state"] = "Empty"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
             case "begin":
+                if producer_id not in self._registered_transact_ids[transactional_id]:
+                    raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
                 msg_value["state"] = "Ongoing"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
             case "commit":
+                registered_producers_under_transaction = self._registered_transact_ids[transactional_id]
+                if producer_id not in registered_producers_under_transaction:
+                    raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
+                elif producer_id != registered_producers_under_transaction[-1]:
+                    kafka_error = KafkaError(
+                        KafkaError._FENCED,  # error code -144
+                        "Failed to end transaction: Local: This instance has been fenced by a newer instance",
+                        fatal=True,
+                    )
+                    raise KafkaException(kafka_error)
+
                 msg_value["state"] = "PrepareCommit"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
                 msg_value["state"] = "CompleteCommit"
@@ -167,6 +181,8 @@ class KafkaSimulator:
                     PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())
                 )
             case "abort":
+                if producer_id not in self._registered_transact_ids[transactional_id]:
+                    raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
                 msg_value["state"] = "Abort"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
             case _:
@@ -218,7 +234,7 @@ class KafkaSimulator:
         :note: Separate/common event-loop-like for handling producers/consumers are being tested.
         """
         while True:
-            yield
+            yield NotImplemented
 
     # def run(self):
     #     # handle producers

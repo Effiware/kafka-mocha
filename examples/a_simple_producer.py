@@ -6,7 +6,7 @@ import confluent_kafka
 from examples._confexmp import handle_produce
 from kafka_mocha import mock_producer
 
-TOPIC_NAME = "test-topic"
+TOPIC_NAME = "test-simple-producer-topic"
 
 
 @mock_producer()
@@ -74,7 +74,7 @@ def as_context_manager():
         # some post-processing
 
 
-@mock_producer(output={"format": "html"})
+@mock_producer(output={"format": "html", "name": "test-simple-producer.html"})
 def as_decorated_inner_function():
     """It can be used as a decorator around an inner function. Explicitly set output to HTML.
 

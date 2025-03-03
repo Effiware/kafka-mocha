@@ -2,7 +2,7 @@ from logging import LogRecord
 
 import pytest
 
-from kafka_mocha.klogger import get_filter, get_custom_logger
+from kafka_mocha.klogger import get_custom_logger, get_filter
 
 
 def test_all_filter(foo_log_record: LogRecord) -> None:

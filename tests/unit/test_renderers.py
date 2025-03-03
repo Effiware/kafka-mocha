@@ -3,13 +3,13 @@ from time import sleep
 
 from confluent_kafka import TIMESTAMP_CREATE_TIME
 
-from kafka_mocha.models import KRecord, KTopic, KHeader
+from kafka_mocha.models import KHeader, KRecord, KTopic
 from kafka_mocha.renderers import render_csv, render_html
 
 
 def test_render_html() -> None:
     """Test rendering HTML output."""
-    topic_1, topic_2 = KTopic("topic_1"), KTopic("topic_2", partition_no=3)
+    topic_1, topic_2 = KTopic("test-html-topic-1"), KTopic("test-html-topic-2", partition_no=3)
     _range = 10
 
     for i in range(_range):
@@ -24,7 +24,7 @@ def test_render_html() -> None:
                         key=f"key_{individual}".encode(),
                         value=f"value_{individual}".encode(),
                         timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000)),
-                        headers=[KHeader("header_key", b"header_value")] if individual % 3 == 0 else None
+                        headers=[KHeader("header_key", b"header_value")] if individual % 3 == 0 else None,
                     )
                 )
                 sleep(0.01)
@@ -33,12 +33,12 @@ def test_render_html() -> None:
         for p in t.partitions:
             p._heap.sort(key=lambda x: x[5][1])
 
-    render_html([topic_1, topic_2])
+    render_html([topic_1, topic_2], name="test-render-html.html")
 
 
 def test_render_csv() -> None:
     """Test rendering CSV output."""
-    topic_1, topic_2 = KTopic("topic_1"), KTopic("topic_2", partition_no=2)
+    topic_1, topic_2 = KTopic("test-csv-topic-1"), KTopic("test-csv-topic-2", partition_no=2)
     _range = 3
 
     for i in range(_range):
@@ -53,7 +53,7 @@ def test_render_csv() -> None:
                         key=f"key_{individual}".encode(),
                         value=f"value_{individual}".encode(),
                         timestamp=(TIMESTAMP_CREATE_TIME, int(datetime.now().timestamp() * 1000)),
-                        headers=(KHeader("header_key", b"header_value"),) if individual % 2 == 0 else None
+                        headers=(KHeader("header_key", b"header_value"),) if individual % 2 == 0 else None,
                     )
                 )
                 sleep(0.1)
