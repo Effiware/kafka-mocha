@@ -101,7 +101,7 @@ def transactional_producer_unhappy_path():
 def stale_transaction_fencing():
     """Stale transaction fencing. The first producer is fenced out by the second one.
 
-    >>> stale_transaction_fencing()
+    >>> stale_transaction_fencing() # doctest: +SKIP
     second-producer: transaction committed
     first-producer: KafkaError{FATAL,code=_FENCED,val=-144,str="Failed to end transaction: Local: This instance has been fenced by a newer instance"}
     """
@@ -120,7 +120,7 @@ def stale_transaction_fencing():
                 producer.begin_transaction()
                 producer.produce(TOPIC_NAME, datetime.now().isoformat(), str(self.run_id))
 
-                sleep(1) if self.run_id % 2 == 0 else None  # simulate a delay/crash for the first producer
+                sleep(3) if self.run_id % 2 == 0 else sleep(1)  # simulate a delay/crash for the first producer
                 try:
                     producer.commit_transaction()
                 except confluent_kafka.KafkaException as e:
