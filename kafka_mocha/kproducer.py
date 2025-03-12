@@ -3,7 +3,7 @@ from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
 from typing import Any, Literal, Optional
 
-from confluent_kafka import KafkaException, TopicPartition
+from confluent_kafka import KafkaError, KafkaException, TopicPartition
 
 from kafka_mocha.buffer_handler import buffer_handler
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
@@ -56,39 +56,30 @@ class KProducer:
         self._kafka_simulator = KafkaSimulator()
         self._ticking_thread.start()
 
-        self.transaction_inited = False
-        self.transaction_begun = False
-
     def abort_transaction(self):
-        if not self.transaction_begun:
-            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
-
+        """Duck type for confluent_kafka/cimpl.py::abort_transaction (see signature there)."""
         self.purge()
         self._kafka_simulator.transaction_coordinator("abort", id(self), self._transactional_id)
+
         key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.ABORT.value})
         value = str({"producerId": id(self), "markerType": KMarkers.ABORT.value})
         message = PMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
         self._send_with_retry(message)
-        self.transaction_begun = False
 
     def begin_transaction(self):
-        if not self.transaction_inited:
-            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
-
+        """Duck type for confluent_kafka/cimpl.py::begin_transaction (see signature there)."""
         self._kafka_simulator.transaction_coordinator("begin", id(self), self._transactional_id)
-        self.transaction_begun = True
 
     def commit_transaction(self):
-        if not self.transaction_begun:
-            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
-
+        """Duck type for confluent_kafka/cimpl.py::commit_transaction (see signature there)."""
+        self._kafka_simulator.transaction_coordinator("commit", id(self), self._transactional_id, dry_run=True)
         self.flush()
         self._kafka_simulator.transaction_coordinator("commit", id(self), self._transactional_id)
+
         key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.COMMIT.value})
         value = str({"producerId": id(self), "markerType": KMarkers.COMMIT.value})
         message = PMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
         self._send_with_retry(message)
-        self.transaction_begun = False
 
     def flush(self, timeout: Optional[float] = None):
         """Duck type for confluent_kafka/cimpl.py::flush (see signature there).
@@ -105,14 +96,17 @@ class KProducer:
             return start_buffer_len - buffer_len
 
     def init_transactions(self):
+        """Duck type for confluent_kafka/cimpl.py::init_transactions (see signature there)."""
         if self._transactional_id is None:
-            # TODO: Check if this is the correct
-            raise KafkaException("{code=_STATE,val=-172,str='Unable to produce message: Local: Erroneous state'}")
-        if self.transaction_inited:
-            raise KafkaException("{code=_STATE,val=-172,str='Operation not valid in state Ready'}")
+            raise KafkaException(
+                KafkaError(
+                    KafkaError._NOT_CONFIGURED,
+                    "The Transactional API requires transactional.id to be configured",
+                    fatal=True,
+                )
+            )
 
         self._kafka_simulator.transaction_coordinator("init", id(self), self._transactional_id)
-        self.transaction_inited = True
 
     def list_topics(self, topic: str = None, timeout: float = -1.0, *args, **kwargs):
         """Duck type for confluent_kafka/cimpl.py::list_topics (see signature there).
@@ -162,7 +156,7 @@ class KProducer:
     def send_offsets_to_transaction(
         self, positions: list[TopicPartition], group_metadata: object, timeout: float = None
     ):
-        raise NotImplementedError("Transactions are not yet fully supported in Kafka Mocha.")
+        raise NotImplementedError("Not yet implemented...")
 
     def set_sasl_credentials(self, *args, **kwargs):
         raise NotImplementedError("Not yet implemented...")
