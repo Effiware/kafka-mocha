@@ -3,7 +3,7 @@ import os
 from collections import defaultdict
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from threading import Lock
-from typing import Any, Literal, Optional
+from typing import Any, Literal, NamedTuple, Optional
 
 from confluent_kafka import KafkaError, KafkaException
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
@@ -24,6 +24,11 @@ except KeyError as err:
     raise KafkaSimulatorBootstrapException(f"Missing Kafka Mocha required variable: {err}") from None
 
 logger = get_custom_logger()
+
+
+class ProducerAndState(NamedTuple):
+    producer_id: int
+    is_ongoing: bool = False
 
 
 class KafkaSimulator:
@@ -58,7 +63,7 @@ class KafkaSimulator:
         self.topics: list[KTopic] = [KTopic.from_env(topic) for topic in TOPICS]
         self.topics.append(KTopic("_schemas"))  # Built-in `_schemas` topic
         self.topics.append(KTopic("__consumer_offsets"))  # Built-in `__consumer_offsets` topic
-        self._registered_transact_ids: dict[str, list[int]] = defaultdict(list)  # Producer's epoch = list length
+        self._registered_transact_ids: dict[str, list[ProducerAndState]] = defaultdict(list)  # Epoch is list length
 
         self.producers_handler = self.handle_producers()
         self.producers_handler.send(KSignals.INIT.value)
@@ -123,12 +128,19 @@ class KafkaSimulator:
             # Register transaction log topic
             topic = KTopic(self.TRANSACT_TOPIC, self.TRANSACT_TOPIC_PARTITION_NO, config={"cleanup.policy": "compact"})
             self.topics.append(topic)
-        self._registered_transact_ids[transactional_id].append(producer_id)
+        self._registered_transact_ids[transactional_id].append(ProducerAndState(producer_id))
 
     def transaction_coordinator(
-        self, state: Literal["init", "begin", "commit", "abort"], producer_id: int, transactional_id: str
-    ):
-        """Transaction coordinator that handles transaction(s) flow."""
+        self,
+        state: Literal["init", "begin", "commit", "abort"],
+        producer_id: int,
+        transactional_id: str,
+        dry_run: bool = False,
+    ) -> None:
+        """
+        Transaction coordinator that handles transaction(s) flow. Transaction state checks are split between
+        transaction_coordinator and Kproducer. Here, only initializations and state transitions are handled.
+        """
         handler = self.producers_handler
         if getgeneratorstate(handler) != GEN_SUSPENDED:
             raise KafkaSimulatorProcessingException(
@@ -157,22 +169,47 @@ class KafkaSimulator:
                 msg_value["producerEpoch"] = len(self._registered_transact_ids[transactional_id]) - 1
                 msg_value["state"] = "Empty"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
+
             case "begin":
-                if producer_id not in self._registered_transact_ids[transactional_id]:
+                if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
                     raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
+
+                transaction_for_producer = list(
+                    filter(lambda x: x[0] == producer_id, self._registered_transact_ids[transactional_id])
+                )
+                if len(transaction_for_producer) > 1:
+                    raise KafkaSimulatorProcessingException("What now?")
+                elif transaction_for_producer[-1][1]:
+                    raise KafkaException(
+                        KafkaError(KafkaError._STATE, "Operation not valid in state Ready", fatal=True)
+                    )
+
                 msg_value["state"] = "Ongoing"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
+                if not dry_run:
+                    # Set it state to ongoing
+                    for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
+                        if _id[0] == producer_id:
+                            self._registered_transact_ids[transactional_id][idx] = ProducerAndState(producer_id, True)
+
             case "commit":
-                registered_producers_under_transaction = self._registered_transact_ids[transactional_id]
-                if producer_id not in registered_producers_under_transaction:
+                if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
                     raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
-                elif producer_id != registered_producers_under_transaction[-1]:
+
+                transaction_for_producer = list(
+                    filter(lambda x: x[0] == producer_id, self._registered_transact_ids[transactional_id])
+                )
+                if producer_id != transaction_for_producer[-1][0]:
                     kafka_error = KafkaError(
                         KafkaError._FENCED,  # error code -144
                         "Failed to end transaction: Local: This instance has been fenced by a newer instance",
                         fatal=True,
                     )
                     raise KafkaException(kafka_error)
+                elif not transaction_for_producer[-1][1]:
+                    raise KafkaException(
+                        KafkaError(KafkaError._STATE, "Operation not valid in state Ready", fatal=True)
+                    )
 
                 msg_value["state"] = "PrepareCommit"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
@@ -180,15 +217,29 @@ class KafkaSimulator:
                 msgs.append(
                     PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())
                 )
+                if not dry_run:
+                    # Reset state
+                    for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
+                        if _id[0] == producer_id:
+                            self._registered_transact_ids[transactional_id][idx] = ProducerAndState(producer_id, False)
+
             case "abort":
-                if producer_id not in self._registered_transact_ids[transactional_id]:
+                if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
                     raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
+
                 msg_value["state"] = "Abort"
                 msgs = [PMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
+                if not dry_run:
+                    # Reset state
+                    for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
+                        if _id[0] == producer_id:
+                            self._registered_transact_ids[transactional_id][idx] = ProducerAndState(producer_id, False)
+
             case _:
                 raise ValueError(f"Invalid transaction state: {state}")
 
-        handler.send(msgs)
+        if not dry_run:
+            handler.send(msgs)
 
     def handle_producers(self):
         """A separate generator function that yields a signal to the caller. Handles incoming messages from producers.

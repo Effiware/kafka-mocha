@@ -18,7 +18,7 @@ class TickingThread(Thread):
         :param message_buffer: Buffer (python generator) that owns the ticking thread (should receive ticks from it).
         :param tick_interval_ms: Interval between ticks in milliseconds.
         """
-        Thread.__init__(self)
+        Thread.__init__(self, name=f"{owner}_ticking_thread")
         self._owner = owner
         self._message_buffer = message_buffer
         self._tick = Tick(tick_interval_ms)

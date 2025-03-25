@@ -82,7 +82,7 @@ def transactional_producer_unhappy_path():
     >>> transactional_producer_unhappy_path()
     """
     producer = confluent_kafka.Producer(
-        {"bootstrap.servers": "localhost:9092", "enable.idempotence": True, "transactional.id": "test-id"}
+        {"bootstrap.servers": "localhost:9092", "enable.idempotence": True, "transactional.id": "test-id-unhappy"}
     )
     producer.init_transactions()
 
@@ -102,8 +102,8 @@ def stale_transaction_fencing():
     """Stale transaction fencing. The first producer is fenced out by the second one.
 
     >>> stale_transaction_fencing() # doctest: +SKIP
-    second-producer: transaction committed
-    first-producer: KafkaError{FATAL,code=_FENCED,val=-144,str="Failed to end transaction: Local: This instance has been fenced by a newer instance"}
+    second_producer: transaction committed
+    first_producer: KafkaError{FATAL,code=_FENCED,val=-144,str="Failed to end transaction: Local: This instance has been fenced by a newer instance"}
     """
 
     class ProducerThread(Thread):
@@ -129,8 +129,8 @@ def stale_transaction_fencing():
                     print(f"{self.name}: transaction committed")
 
 
-    producing_thread_0 = ProducerThread(name="first-producer", run_id=0)
-    producing_thread_1 = ProducerThread(name="second-producer", run_id=1)
+    producing_thread_0 = ProducerThread(name="first_producer", run_id=0)
+    producing_thread_1 = ProducerThread(name="second_producer", run_id=1)
 
     producing_thread_0.start()
     producing_thread_1.start()
