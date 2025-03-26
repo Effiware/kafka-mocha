@@ -1,4 +1,5 @@
 import signal
+from functools import reduce
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
 from typing import Any, Literal, Optional
@@ -160,6 +161,15 @@ class KProducer:
 
     def set_sasl_credentials(self, *args, **kwargs):
         raise NotImplementedError("Not yet implemented...")
+
+    def m__get_all_produced_messages_no(self, topic_name: str) -> int:
+        """Get number of (all) produced messages for a given topic (returns 0 if topic doesn't exist)."""
+        try:
+            topic = [t for t in self._kafka_simulator.topics if t.name == topic_name][0]
+        except IndexError:
+            return 0
+        else:
+            return reduce(lambda x, y: x + len(y), [partition for partition in topic.partitions], 0)
 
     def _tick_buffer(self):
         """

@@ -6,6 +6,19 @@ from confluent_kafka import KafkaError, KafkaException
 from kafka_mocha.kproducer import KProducer
 
 
+def test_kproducer_returns_produced_messages_no__unhappy(kproducer) -> None:
+    """Test that Kafka producer returns number of produced messages - when nothing produced."""
+    assert kproducer.m__get_all_produced_messages_no("test-number-topic") == 0
+
+
+def test_kproducer_returns_produced_messages_no__happy(kproducer) -> None:
+    """Test that Kafka producer returns number of produced messages."""
+    kproducer.produce("test-number-topic", b"key-1", b"value-1")
+    kproducer.produce("test-number-topic", b"key-2", b"value-2")
+    kproducer.flush()
+    assert kproducer.m__get_all_produced_messages_no("test-number-topic") == 2
+
+
 def test_kafka_simulator_received_messages__short_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a short-running task."""
 

@@ -53,6 +53,9 @@ def as_decorated_function():
     producer.flush()
     # some post-processing
 
+    # Producer mock has some special methods (prefixed with m__) that can be used to check the state of the producer
+    assert producer.m__get_all_produced_messages_no(TOPIC_NAME) == 1  # noqa
+
 
 def as_context_manager():
     """It can be used as a context manager.
