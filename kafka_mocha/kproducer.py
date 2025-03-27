@@ -53,6 +53,7 @@ class KProducer:
         )
 
         self._ticking_thread = TickingThread(f"KProducer({id(self)})", self._buffer_handler)
+        self._ticking_thread.daemon = True  # TODO 34: Workaround for #34 bug/34-tickingthread-never-joins
         self._buffer_handler.send(KSignals.INIT.value)
         self._kafka_simulator = KafkaSimulator()
         self._ticking_thread.start()
@@ -115,7 +116,7 @@ class KProducer:
         Returns ClusterMetadata object from Kafka Simulator.
         """
         if timeout != -1.0:
-            self.logger.warning("KProducer doesn't support timing out for this method. Parameter will be ignored.")
+            self.logger.info("KProducer doesn't support timing out for this method. Parameter will be ignored.")
 
         return self._kafka_simulator.get_cluster_mdata(topic)
 
@@ -228,7 +229,10 @@ class KProducer:
     def _done(self):
         """Additional method to gracefully close message buffer."""
         self._ticking_thread.stop()
-        self._ticking_thread.join()
+        self._ticking_thread.join(1.0)
+        if self._ticking_thread.is_alive():
+            # TODO 34: Temporarily set to INFO, should be ERROR
+            self.logger.info("KProducer(%d): Ticking thread is still alive (it's a known issue...)", id(self))
         self._buffer_handler.close()
 
     def __len__(self) -> int:
