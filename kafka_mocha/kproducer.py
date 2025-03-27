@@ -229,7 +229,7 @@ class KProducer:
     def _done(self):
         """Additional method to gracefully close message buffer."""
         self._ticking_thread.stop()
-        self._ticking_thread.join(1.0)
+        self._ticking_thread.join(1.5)
         if self._ticking_thread.is_alive():
             # TODO 34: Temporarily set to INFO, should be ERROR
             self.logger.info("KProducer(%d): Ticking thread is still alive (it's a known issue...)", id(self))

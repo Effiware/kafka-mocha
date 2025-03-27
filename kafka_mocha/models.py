@@ -43,18 +43,18 @@ class KHeader:
 class ABCMessage(ABC):
     topic: str
     partition: int
-    key: bytes
-    value: bytes
+    key: Optional[bytes]
+    value: Optional[bytes]
     headers: Optional[tuple[KHeader, ...] | list[KHeader]] = field(default=None, compare=False)
     timestamp: tuple[int, int] = field(default=(TIMESTAMP_CREATE_TIME, -1), kw_only=True)
     compression_type: CompressionType = field(default=CompressionType.NONE, compare=False, kw_only=True)
     marker: bool = field(default=False, kw_only=True)
 
     def __post_init__(self):
-        if not isinstance(self.key, bytes):
-            raise TypeError("Message's key must be bytes")
-        if not isinstance(self.value, bytes):
-            raise TypeError("Message's value must be bytes")
+        if not isinstance(self.key, bytes) and self.key is not None:
+            raise TypeError("Message's key must be bytes (or None)")
+        if not isinstance(self.value, bytes) and self.value is not None:
+            raise TypeError("Message's value must be bytes (or None)")
         if self.headers:
             if not isinstance(self.headers, tuple) and not isinstance(self.headers, list):
                 raise TypeError("Message's headers must be a tuple or a list")
