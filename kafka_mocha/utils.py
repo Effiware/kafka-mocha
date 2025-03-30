@@ -218,11 +218,42 @@ def validate_producer_config(config) -> None:
     :raises KafkaClientBootstrapException: If configuration is invalid
     """
 
+    # Idempotence-related configuration validation
+    enable_idempotence = config.get("enable.idempotence", False)
+    max_inflight_requests_per_connection = config.pop("max.in.flight.requests.per.connection", None)
+    queuing_strategy = config.get("queuing.strategy")
+    message_send_max_retries = config.get("retries", config.get("message.send.max.retries"))
+    request_required_acks = config.get("acks", config.get("request.required.acks"))
+    if request_required_acks == "all":  # all -> -1
+        config["acks"] = -1
+        config["request.required.acks"] = -1
+        request_required_acks = -1
+
+    # Transaction-related configuration validation
+    transactional_id = config.get("transactional.id")
+    transaction_ms = config.get("transaction.timeout.ms")
+
     _validate_against_schema(producer_config_schema, config)
 
-    transactional_id = config.get("transactional.id")
-    enable_idempotence = config.get("enable.idempotence")
-    transaction_ms = config.get("transaction.timeout.ms")
+    if enable_idempotence:
+        if max_inflight_requests_per_connection is not None and max_inflight_requests_per_connection > 5:
+            raise KafkaClientBootstrapException(
+                "Configuration validation errors: max.in.flight.requests.per.connection "
+                "must be 5 (or less) when enable.idempotence is enabled"
+            )
+        if queuing_strategy is not None and queuing_strategy != "fifo":
+            raise KafkaClientBootstrapException(
+                "Configuration validation errors: queuing.strategy must be 'fifo' when enable.idempotence is enabled"
+            )
+        if message_send_max_retries is not None and message_send_max_retries == 0:
+            raise KafkaClientBootstrapException(
+                "Configuration validation errors: retries must be 0 when enable.idempotence is enabled"
+            )
+        if request_required_acks is not None and request_required_acks != -1:
+            raise KafkaClientBootstrapException(
+                "Configuration validation errors: acks must be -1 (all) when enable.idempotence is enabled"
+            )
+
     if transactional_id and not enable_idempotence:
         raise KafkaClientBootstrapException(
             "Configuration validation errors: transactional.id requires enable.idempotence"

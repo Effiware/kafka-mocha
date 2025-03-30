@@ -142,7 +142,35 @@ def test_validate_producer_config_unhappy_path(key: str, value: Any) -> None:
         validate_producer_config(config)
 
 
-def test_validate_producer_config_transactional_happy_path() -> None:
+def test_validate_producer_config_happy_path_idempotence() -> None:
+    """Test validate_producer_config with valid idempotence configuration parameters."""
+
+    config = {"enable.idempotence": True}
+    validate_producer_config(config)
+
+    config = {
+        "enable.idempotence": True,
+        "max.in.flight.requests.per.connection": 5,
+        "retries": 2147483647,
+        "acks": "all",
+        "queuing.strategy": "fifo",
+    }
+    validate_producer_config(config)
+
+
+@pytest.mark.parametrize(
+    "key, value",
+    [("max.in.flight.requests.per.connection", 6), ("retries", 0), ("acks", 0), ("queuing.strategy", "lifo")],
+)
+def test_validate_producer_config_unhappy_path_idempotence(key: str, value: int | str) -> None:
+    """Test validate_producer_config with invalid idempotence configuration parameters."""
+
+    config = {"enable.idempotence": True, key: value}
+    with pytest.raises(KafkaClientBootstrapException):
+        validate_producer_config(config)
+
+
+def test_validate_producer_config_happy_path_transactional() -> None:
     """Test validate_producer_config with valid transactional configuration parameters."""
 
     config = {"enable.idempotence": True, "transactional.id": "test-id"}
@@ -152,7 +180,7 @@ def test_validate_producer_config_transactional_happy_path() -> None:
     validate_producer_config(config)
 
 
-def test_validate_producer_config_transactional_unhappy_path() -> None:
+def test_validate_producer_config_unhappy_path_transactional() -> None:
     """Test validate_producer_config with invalid transactional configuration parameters."""
 
     config = {"transactional.id": "test-id"}
