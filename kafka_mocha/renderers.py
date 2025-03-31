@@ -1,8 +1,8 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from functools import reduce
 from pathlib import Path
 from platform import system
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from jinja2 import Environment, FileSystemLoader
 

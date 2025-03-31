@@ -2,13 +2,12 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Callable, Literal
 
-from confluent_kafka import TIMESTAMP_CREATE_TIME
+import confluent_kafka
 
 from kafka_mocha.exceptions import KProducerProcessingException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.kmodels import KMessage
-
 from kafka_mocha.signals import KSignals, Tick
 
 logger = get_custom_logger()
@@ -130,7 +129,7 @@ def buffer_handler(
                                 partition,
                                 new_msg.key(),
                                 new_msg.value(None),
-                                timestamp=(ts, TIMESTAMP_CREATE_TIME),
+                                timestamp=(ts, confluent_kafka.TIMESTAMP_CREATE_TIME),
                                 marker=new_msg._marker,
                             )
                         )
@@ -141,10 +140,10 @@ def buffer_handler(
                 # (Normal) PMessage received
                 new_msg.set_timestamp(
                     _get_elapsed_time(buffer_start_time, buffer_loop_no, buffer_timeout, buffer_elapsed_time),
-                    TIMESTAMP_CREATE_TIME,
+                    confluent_kafka.TIMESTAMP_CREATE_TIME,
                 )
                 new_msg.set_partition(
-                    partitioner(new_msg.topic(), new_msg.key()) if new_msg.partition == -1 else new_msg.partition()
+                    partitioner(new_msg.topic(), new_msg.key()) if new_msg.partition() == -1 else new_msg.partition()
                 )
                 buffer.append(new_msg)
                 transact_cache[new_msg.topic()].append(new_msg.partition()) if transact else None

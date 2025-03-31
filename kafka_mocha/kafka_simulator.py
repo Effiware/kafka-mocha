@@ -5,21 +5,21 @@ from inspect import GEN_SUSPENDED, getgeneratorstate
 from threading import Lock
 from typing import Any, Literal, NamedTuple, Optional
 
-from confluent_kafka import KafkaError, KafkaException, TIMESTAMP_CREATE_TIME
+import confluent_kafka
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
 from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaSimulatorProcessingException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.kmodels import KMessage, KTopic
-# from kafka_mocha.models import KRecord, KTopic, PMessage
 from kafka_mocha.renderers import render
 from kafka_mocha.signals import KSignals
 
 try:
     ONE_ACK_DELAY = os.environ.get("KAFKA_MOCHA_KSIM_ONE_ACK_DELAY", 1)
     ALL_ACK_DELAY = os.environ.get("KAFKA_MOCHA_KSIM_ALL_ACK_DELAY", 3)
-    # MESSAGE_TIMESTAMP_TYPE = os.environ.get("KAFKA_MOCHA_KSIM_MESSAGE_TIMESTAMP_TYPE", "EventTime")
-    MESSAGE_TIMESTAMP_TYPE = TIMESTAMP_CREATE_TIME
+    MESSAGE_TIMESTAMP_TYPE = os.environ.get(
+        "KAFKA_MOCHA_KSIM_MESSAGE_TIMESTAMP_TYPE", confluent_kafka.TIMESTAMP_CREATE_TIME
+    )
     AUTO_CREATE_TOPICS_ENABLE = os.environ.get("KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE", "true").lower() == "true"
     TOPICS = json.loads(os.environ.get("KAFKA_MOCHA_KSIM_TOPICS", "[]"))
 except KeyError as err:
@@ -174,7 +174,11 @@ class KafkaSimulator:
 
             case "begin":
                 if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
-                    raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
+                    raise confluent_kafka.KafkaException(
+                        confluent_kafka.KafkaError(
+                            confluent_kafka.KafkaError._STATE, "Operation not valid in state Init", fatal=True
+                        )
+                    )
 
                 transaction_for_producer = list(
                     filter(lambda x: x[0] == producer_id, self._registered_transact_ids[transactional_id])
@@ -182,8 +186,10 @@ class KafkaSimulator:
                 if len(transaction_for_producer) > 1:
                     raise KafkaSimulatorProcessingException("What now?")
                 elif transaction_for_producer[-1][1]:
-                    raise KafkaException(
-                        KafkaError(KafkaError._STATE, "Operation not valid in state Ready", fatal=True)
+                    raise confluent_kafka.KafkaException(
+                        confluent_kafka.KafkaError(
+                            confluent_kafka.KafkaError._STATE, "Operation not valid in state Ready", fatal=True
+                        )
                     )
 
                 msg_value["state"] = "Ongoing"
@@ -196,21 +202,27 @@ class KafkaSimulator:
 
             case "commit":
                 if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
-                    raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
+                    raise confluent_kafka.KafkaException(
+                        confluent_kafka.KafkaError(
+                            confluent_kafka.KafkaError._STATE, "Operation not valid in state Init", fatal=True
+                        )
+                    )
 
                 transaction_for_producer = list(
                     filter(lambda x: x[0] == producer_id, self._registered_transact_ids[transactional_id])
                 )
                 if producer_id != transaction_for_producer[-1][0]:
-                    kafka_error = KafkaError(
-                        KafkaError._FENCED,  # error code -144
+                    kafka_error = confluent_kafka.KafkaError(
+                        confluent_kafka.KafkaError._FENCED,  # error code -144
                         "Failed to end transaction: Local: This instance has been fenced by a newer instance",
                         fatal=True,
                     )
-                    raise KafkaException(kafka_error)
+                    raise confluent_kafka.KafkaException(kafka_error)
                 elif not transaction_for_producer[-1][1]:
-                    raise KafkaException(
-                        KafkaError(KafkaError._STATE, "Operation not valid in state Ready", fatal=True)
+                    raise confluent_kafka.KafkaException(
+                        confluent_kafka.KafkaError(
+                            confluent_kafka.KafkaError._STATE, "Operation not valid in state Ready", fatal=True
+                        )
                     )
 
                 msg_value["state"] = "PrepareCommit"
@@ -227,7 +239,11 @@ class KafkaSimulator:
 
             case "abort":
                 if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
-                    raise KafkaException(KafkaError(KafkaError._STATE, "Operation not valid in state Init", fatal=True))
+                    raise confluent_kafka.KafkaException(
+                        confluent_kafka.KafkaError(
+                            confluent_kafka.KafkaError._STATE, "Operation not valid in state Init", fatal=True
+                        )
+                    )
 
                 msg_value["state"] = "Abort"
                 msgs = [KMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
@@ -276,10 +292,8 @@ class KafkaSimulator:
                         _msg_pid_already_appended = msg._pid in [krecord._pid for krecord in partition._heap]
                         if _msg_pid_already_appended:
                             continue
-                    msg.set_offset(1000 + len(partition._heap))
+                    msg.set_offset(1000 + len(partition))
                     msg.set_timestamp(last_received_msg_ts, MESSAGE_TIMESTAMP_TYPE)
-                    # last_offset = 1000 + len(partition._heap)
-                    # k_record = KRecord.from_pmessage(msg, last_offset, MESSAGE_TIMESTAMP_TYPE, last_received_msg_ts)
                     partition.append(msg)
                     logger.debug(f"Appended message: {msg}")
 

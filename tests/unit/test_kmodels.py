@@ -1,7 +1,7 @@
+from typing import Any
+
 import confluent_kafka
 import pytest
-
-from typing import Any
 
 from kafka_mocha.kmodels import CompressionType, KMessage
 

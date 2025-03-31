@@ -4,14 +4,13 @@ from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
 from typing import Any, Literal, Optional
 
-from confluent_kafka import KafkaError, KafkaException, TopicPartition
+import confluent_kafka
 
 from kafka_mocha.buffer_handler import buffer_handler
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.kmodels import KMessage
-# from kafka_mocha.models import PMessage
 from kafka_mocha.signals import KMarkers, KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
 from kafka_mocha.utils import validate_config
@@ -101,9 +100,9 @@ class KProducer:
     def init_transactions(self):
         """Duck type for confluent_kafka/cimpl.py::init_transactions (see signature there)."""
         if self._transactional_id is None:
-            raise KafkaException(
-                KafkaError(
-                    KafkaError._NOT_CONFIGURED,
+            raise confluent_kafka.KafkaException(
+                confluent_kafka.KafkaError(
+                    confluent_kafka.KafkaError._NOT_CONFIGURED,
                     "The Transactional API requires transactional.id to be configured",
                     fatal=True,
                 )
@@ -158,7 +157,7 @@ class KProducer:
         self._send_with_retry(message)
 
     def send_offsets_to_transaction(
-        self, positions: list[TopicPartition], group_metadata: object, timeout: float = None
+        self, positions: list[confluent_kafka.TopicPartition], group_metadata: object, timeout: float = None
     ):
         raise NotImplementedError("Not yet implemented...")
 

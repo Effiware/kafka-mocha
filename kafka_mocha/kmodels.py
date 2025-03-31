@@ -1,5 +1,5 @@
 from enum import Enum, auto
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Optional
 
 import confluent_kafka
 
@@ -51,9 +51,6 @@ class KMessage:
         self._key: Optional[str | bytes] = key
         self._value: Optional[str | bytes] = value
         self._headers: Optional[list[tuple[str, bytes]]] = headers
-        # self._timestamp = (
-        #     (timestamp, confluent_kafka.TIMESTAMP_CREATE_TIME) if isinstance(timestamp, int) else timestamp
-        # )
         if isinstance(timestamp, int):
             self._timestamp = (timestamp, confluent_kafka.TIMESTAMP_CREATE_TIME)
         else:
@@ -206,6 +203,10 @@ class KMessage:
     def set_error(self, state: int, msg: str, fatal: bool = True) -> None:
         """Set the field 'Message.error' with new value."""
         self._error = confluent_kafka.KafkaError(state, msg, fatal=fatal)
+
+    def __str__(self) -> str:
+        return (f"KMessage(topic={self._topic}, partition={self._partition}, offset={self._offset}, key={self._key}, "
+                f"value={self._value}, headers={self._headers}, timestamp={self._timestamp})")
 
     def __len__(self, *args, **kwargs) -> int:
         header_acc = 0
