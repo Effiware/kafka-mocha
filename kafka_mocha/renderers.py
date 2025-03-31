@@ -28,7 +28,7 @@ def _prepare_records(topics: list[KTopic]) -> list[dict[str, Any]]:
                 "name": topic.name,
                 "messages": sorted(
                     reduce(lambda x, y: x + y, [partition._heap for partition in topic.partitions], []),
-                    key=lambda x: x[5][1],
+                    key=lambda x: x.timestamp()[1],
                 ),
             }
         )

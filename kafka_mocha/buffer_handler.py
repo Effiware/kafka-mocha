@@ -7,7 +7,8 @@ from confluent_kafka import TIMESTAMP_CREATE_TIME
 from kafka_mocha.exceptions import KProducerProcessingException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.models import PMessage
+from kafka_mocha.kmodels import KMessage
+
 from kafka_mocha.signals import KSignals, Tick
 
 logger = get_custom_logger()
@@ -68,7 +69,7 @@ def get_partitioner(
 
 
 def buffer_handler(
-    owner: str, buffer: list[PMessage], buffer_len: int, buffer_timeout: int = 2, transact: bool = False
+    owner: str, buffer: list[KMessage], buffer_len: int, buffer_timeout: int = 2, transact: bool = False
 ) -> None:
     """Handles buffering of messages before sending them to Kafka. It's a (middleware) generator function that
     replicates Kafka producer behavior.
@@ -77,7 +78,7 @@ def buffer_handler(
     and other features by producer's configuration parameters.
 
     :param owner: Name of the producer instance.
-    :param buffer: Actual buffer (list of PMessages) is owned by Kproducer, but handled here.
+    :param buffer: Actual buffer (list of KMessage) is owned by Kproducer, but handled here.
     :param buffer_len: Maximum length of the buffer.
     :param buffer_timeout: Maximum time to wait before forcing flush.
     :param transact: Transactional mode flag.
@@ -98,7 +99,7 @@ def buffer_handler(
     res = KSignals.BUFFERED
     while True:
         while len(buffer) < buffer_len:  # TODO: Add support for batch size (bytes)
-            new_msg: PMessage | int = yield res
+            new_msg: KMessage | int = yield res
             if isinstance(new_msg, int):
                 # Int = Tick signal received
                 if new_msg == Tick.DONE:
@@ -111,26 +112,26 @@ def buffer_handler(
                         logger.debug("Buffer for %s: forcing flush due to timeout...", owner)
                         break
 
-            elif new_msg.marker:
+            elif new_msg._marker:
                 # Transaction marker received
                 if not transact:
                     raise KProducerProcessingException("Transaction marker received but transaction is not enabled.")
                 if buffer:
                     raise KProducerProcessingException("Transaction marker received but buffer is not empty.")
-                logger.debug("Buffer for %s: received marker: %s", owner, new_msg.marker)
+                logger.debug("Buffer for %s: received marker: %s", owner, new_msg._marker)
 
                 markers_buffer = []
                 ts = _get_elapsed_time(buffer_start_time, buffer_loop_no, buffer_timeout, buffer_elapsed_time)
                 for topic, partitions in transact_cache.items():
                     for partition in partitions:
                         markers_buffer.append(
-                            PMessage(
+                            KMessage(
                                 topic,
                                 partition,
-                                new_msg.key,
-                                new_msg.value,
-                                timestamp=(TIMESTAMP_CREATE_TIME, ts),
-                                marker=new_msg.marker,
+                                new_msg.key(),
+                                new_msg.value(None),
+                                timestamp=(ts, TIMESTAMP_CREATE_TIME),
+                                marker=new_msg._marker,
                             )
                         )
                 kafka_handler.send(markers_buffer)
@@ -138,14 +139,15 @@ def buffer_handler(
 
             else:
                 # (Normal) PMessage received
-                new_msg.timestamp = TIMESTAMP_CREATE_TIME, _get_elapsed_time(
-                    buffer_start_time, buffer_loop_no, buffer_timeout, buffer_elapsed_time
+                new_msg.set_timestamp(
+                    _get_elapsed_time(buffer_start_time, buffer_loop_no, buffer_timeout, buffer_elapsed_time),
+                    TIMESTAMP_CREATE_TIME,
                 )
-                new_msg.partition = (
-                    partitioner(new_msg.topic, new_msg.key) if new_msg.partition == -1 else new_msg.partition
+                new_msg.set_partition(
+                    partitioner(new_msg.topic(), new_msg.key()) if new_msg.partition == -1 else new_msg.partition()
                 )
                 buffer.append(new_msg)
-                transact_cache[new_msg.topic].append(new_msg.partition) if transact else None
+                transact_cache[new_msg.topic()].append(new_msg.partition()) if transact else None
                 res = KSignals.BUFFERED
 
         if buffer:
