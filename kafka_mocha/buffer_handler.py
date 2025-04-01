@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
+from functools import reduce
 from typing import Callable, Literal
 
 import confluent_kafka
@@ -10,7 +11,19 @@ from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.kmodels import KMessage
 from kafka_mocha.signals import KSignals, Tick
 
+DEFAULT_BUFFER_SIZE = 1048576  # 1MB
+DEFAULT_BUFFER_TIMEOUT = 5  # 5ms
+
 logger = get_custom_logger()
+
+
+def _get_buffer_size(buffer: list[KMessage]) -> int:
+    """Calculate buffer (byte) size (understood as byte size) based on the current buffer length and messages size.
+
+    :param buffer: List of KMessage instances.
+    :return: Buffer size.
+    """
+    return reduce(lambda acc, msg: acc + len(msg), buffer, 0)
 
 
 def _get_elapsed_time(
@@ -68,7 +81,7 @@ def get_partitioner(
 
 
 def buffer_handler(
-    owner: str, buffer: list[KMessage], buffer_len: int, buffer_timeout: int = 2, transact: bool = False
+    owner: str, buffer: list[KMessage], buffer_max_len: int, buffer_timeout: int = 5, transact: bool = False
 ) -> None:
     """Handles buffering of messages before sending them to Kafka. It's a (middleware) generator function that
     replicates Kafka producer behavior.
@@ -78,13 +91,13 @@ def buffer_handler(
 
     :param owner: Name of the producer instance.
     :param buffer: Actual buffer (list of KMessage) is owned by Kproducer, but handled here.
-    :param buffer_len: Maximum length of the buffer.
+    :param buffer_max_len: Maximum length of the buffer.
     :param buffer_timeout: Maximum time to wait before forcing flush.
     :param transact: Transactional mode flag.
 
     :raises KProducerProcessingException: In case of processing errors (probable bugs).
     """
-    logger.info(f"Buffer for {owner} has been primed, length: {buffer_len}, timeout: {buffer_timeout}")
+    logger.info("Buffer for %s has been primed, max length: %s, timeout: %s", owner, buffer_max_len, buffer_timeout)
     buffer_start_time = datetime.now()
     buffer_elapsed_time = 0
     buffer_loop_no = 0
@@ -97,7 +110,7 @@ def buffer_handler(
     kafka_handler = kafka_simulator.producers_handler
     res = KSignals.BUFFERED
     while True:
-        while len(buffer) < buffer_len:  # TODO: Add support for batch size (bytes)
+        while _get_buffer_size(buffer) < DEFAULT_BUFFER_SIZE and len(buffer) < buffer_max_len:
             new_msg: KMessage | int = yield res
             if isinstance(new_msg, int):
                 # Int = Tick signal received
@@ -153,12 +166,19 @@ def buffer_handler(
             res = kafka_handler.send(buffer)
             logger.info("Buffer for %s: Kafka response: %s", owner, res)
         else:
-            logger.info("Buffer for %s: nothing to send...", owner)
-        if res == KSignals.SUCCESS:
+            logger.debug("Buffer for %s: nothing to send...", owner)
+        if res in {KSignals.SUCCESS, KSignals.FAILURE}:
+            shared_error = (
+                confluent_kafka.KafkaError(
+                    -1, "Proper error feedback form Kafka Broker (Simulator) is not yet implemented.", fatal=True
+                )
+                if res == KSignals.FAILURE
+                else None
+            )
             try:
                 for msg in buffer:
                     if msg.on_delivery:
-                        msg.on_delivery(None, "TODO: add proper message")  # TODO
+                        msg.on_delivery(shared_error, msg)
             except Exception as e:
                 logger.error("Buffer for %s: Error while executing callback: %s", owner, e)
             finally:

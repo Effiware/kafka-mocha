@@ -61,7 +61,7 @@ def as_context_manager():
     """It can be used as a context manager.
 
     >>> as_context_manager()
-    Mock message delivered (context manager)
+    Mock message delivered to test-simple-producer-topic (context manager)
     """
     with mock_producer():
         producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
@@ -71,7 +71,11 @@ def as_context_manager():
             TOPIC_NAME,
             datetime.now().isoformat(),
             str(id(producer)),
-            on_delivery=lambda err, msg: print("Mock message delivered (context manager)"),
+            on_delivery=lambda err, msg: (
+                print(f"Mock message delivered to {msg.topic()} (context manager)")
+                if not err
+                else print(f"Error: {err}")
+            ),
         )
         producer.flush()
         # some post-processing

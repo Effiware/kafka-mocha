@@ -44,44 +44,27 @@ def test_kmessage_incorrect_creation_error_messages() -> None:
     assert "value" in err.value.args[0].lower()
 
     with pytest.raises(TypeError) as err:
-        KMessage("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), {"h-key": "h-value"})
+        KMessage("topic", 0, b"key1", b"value1", {"h-key": "h-value"})
     assert "headers" in err.value.args[0].lower()
 
     with pytest.raises(TypeError) as err:
-        KMessage("topic", 0, "key1".encode("utf-8"), "value1".encode("utf-8"), [("h-key", "h-value")])
+        KMessage("topic", 0, b"key1", b"value1", [("h-key", "h-value")])
+    assert "headers" in err.value.args[0].lower()
+
+    with pytest.raises(TypeError) as err:
+        KMessage("topic", 0, b"key1", b"value1", [2, b"h-value"])
     assert "headers" in err.value.args[0].lower()
 
     with pytest.raises(ValueError) as err:
-        KMessage(
-            "topic",
-            0,
-            "key1".encode("utf-8"),
-            "value1".encode("utf-8"),
-            [
-                (
-                    "h-key",
-                    "h-value".encode("utf-8"),
-                )
-            ],
-            ("created", 0),
-        )
+        KMessage("topic", 0, b"key1", b"value1", [("h-key", b"h-value")], -20)
+    assert "timestamp" in err.value.args[0].lower()
+
+    with pytest.raises(ValueError) as err:
+        KMessage("topic", 0, b"key1", b"value1", [("h-key", b"h-value")], ("created", 0))
     assert "timestamp" in err.value.args[0].lower()
 
     with pytest.raises(TypeError) as err:
-        KMessage(
-            "topic",
-            0,
-            "key1".encode("utf-8"),
-            "value1".encode("utf-8"),
-            [
-                (
-                    "h-key",
-                    "h-value".encode("utf-8"),
-                )
-            ],
-            (0, 1),
-            offset="dupa",
-        )
+        KMessage("topic", 0, b"key1", b"value1", [("h-key", b"h-value")], (0, 1), offset="dupa")
     assert "offset" in err.value.args[0].lower()
 
 

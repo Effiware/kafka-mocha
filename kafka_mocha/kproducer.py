@@ -41,13 +41,12 @@ class KProducer:
         self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
         self.buffer = []
-        buffer_len = config.get("queue.buffering.max.messages", 5)
-        buffer_len = MAX_BUFFER_LEN if buffer_len == 0 else buffer_len
+        buffer_max_len = config.get("queue.buffering.max.messages", 1000)
         buffer_max_ms = config.get("linger.ms", config.get("queue.buffering.max.ms", 300))
         self._buffer_handler = buffer_handler(
             f"KProducer({id(self)})",
             self.buffer,
-            buffer_len,
+            buffer_max_len,
             buffer_max_ms,
             transact=self._transactional_id is not None,
         )
@@ -144,15 +143,6 @@ class KProducer:
 
         Instead of producing a real message to Kafka, it is sent to Kafka Simulator.
         """
-        # message = PMessage.from_producer_data(
-        #     topic=topic,
-        #     partition=partition,
-        #     key=key,
-        #     value=value,
-        #     timestamp=timestamp,
-        #     headers=headers,
-        #     on_delivery=on_delivery,
-        # )
         message = KMessage(topic, partition, key, value, headers, timestamp, on_delivery=on_delivery)
         self._send_with_retry(message)
 

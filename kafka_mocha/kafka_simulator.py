@@ -179,7 +179,6 @@ class KafkaSimulator:
                             confluent_kafka.KafkaError._STATE, "Operation not valid in state Init", fatal=True
                         )
                     )
-
                 transaction_for_producer = list(
                     filter(lambda x: x[0] == producer_id, self._registered_transact_ids[transactional_id])
                 )
@@ -191,7 +190,6 @@ class KafkaSimulator:
                             confluent_kafka.KafkaError._STATE, "Operation not valid in state Ready", fatal=True
                         )
                     )
-
                 msg_value["state"] = "Ongoing"
                 msgs = [KMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
                 if not dry_run:
@@ -207,7 +205,6 @@ class KafkaSimulator:
                             confluent_kafka.KafkaError._STATE, "Operation not valid in state Init", fatal=True
                         )
                     )
-
                 transaction_for_producer = list(
                     filter(lambda x: x[0] == producer_id, self._registered_transact_ids[transactional_id])
                 )
@@ -224,7 +221,6 @@ class KafkaSimulator:
                             confluent_kafka.KafkaError._STATE, "Operation not valid in state Ready", fatal=True
                         )
                     )
-
                 msg_value["state"] = "PrepareCommit"
                 msgs = [KMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
                 msg_value["state"] = "CompleteCommit"
@@ -244,7 +240,6 @@ class KafkaSimulator:
                             confluent_kafka.KafkaError._STATE, "Operation not valid in state Init", fatal=True
                         )
                     )
-
                 msg_value["state"] = "Abort"
                 msgs = [KMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
                 if not dry_run:
@@ -282,7 +277,7 @@ class KafkaSimulator:
                 elif len(_msg_destination_topic) > 1:
                     raise KafkaSimulatorProcessingException("We have a bug here....")
 
-                _topic = _msg_destination_topic[-1]  # [kpartition][-1] == kpartition
+                _topic = _msg_destination_topic[-1]
                 try:
                     partition = _topic.partitions[msg.partition()]
                 except IndexError:
@@ -295,7 +290,7 @@ class KafkaSimulator:
                     msg.set_offset(1000 + len(partition))
                     msg.set_timestamp(last_received_msg_ts, MESSAGE_TIMESTAMP_TYPE)
                     partition.append(msg)
-                    logger.debug(f"Appended message: {msg}")
+                    logger.debug("Appended message: %s", msg)
 
     def handle_consumers(self):
         """A separate generator function that yields a signal to the caller. Handles delivering messages to consumer.

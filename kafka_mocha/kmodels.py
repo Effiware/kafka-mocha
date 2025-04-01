@@ -205,13 +205,16 @@ class KMessage:
         self._error = confluent_kafka.KafkaError(state, msg, fatal=fatal)
 
     def __str__(self) -> str:
-        return (f"KMessage(topic={self._topic}, partition={self._partition}, offset={self._offset}, key={self._key}, "
-                f"value={self._value}, headers={self._headers}, timestamp={self._timestamp})")
+        return (
+            f"KMessage(topic={self._topic}, partition={self._partition}, offset={self._offset}, key={self._key}, "
+            f"value={self._value}, headers={self._headers}, timestamp={self._timestamp})"
+        )
 
     def __len__(self, *args, **kwargs) -> int:
         header_acc = 0
-        for header in self._headers:
-            header_acc += len(header[0]) + len(header[1])
+        if self._headers:
+            for header in self._headers:
+                header_acc += len(header[0]) + len(header[1])
         return len(self._key) + len(self._value) + header_acc
 
 
