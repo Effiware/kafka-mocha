@@ -1,3 +1,4 @@
+from random import randint
 from time import sleep
 
 import pytest
@@ -24,7 +25,7 @@ def test_kafka_simulator_received_messages__short_running_task(kafka, kproducer)
 
     no_msg_to_produce = 10000
     for idx, _ in enumerate(range(no_msg_to_produce)):
-        kproducer.produce("topic-1", "value".encode(), f"key-{idx}".encode(), on_delivery=lambda *_: None)
+        kproducer.produce("topic-1", "value".encode(), f"key-{idx}".encode(), on_delivery=lambda *_: randint(1, 100))
 
     kproducer._done()
 
@@ -68,7 +69,7 @@ def test_kafka_simulator_received_messages__long_running_task(kafka, kproducer):
             f"key-{idx}".encode(),
             "value".encode(),
             headers=[(f"hkey-{idx}", b"hvalue")],
-            on_delivery=lambda *_: None,
+            on_delivery=lambda err, msg: print(f"Error: {err}") if err else print(f"Message delivered: {msg.offset()}")
         )
 
     kproducer._done()

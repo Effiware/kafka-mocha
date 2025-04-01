@@ -1,7 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import reduce
-from typing import Callable, Literal
+from threading import Thread
+from typing import Callable, Literal, Optional
 
 import confluent_kafka
 
@@ -175,13 +176,33 @@ def buffer_handler(
                 if res == KSignals.FAILURE
                 else None
             )
-            try:
-                for msg in buffer:
-                    if msg.on_delivery:
-                        msg.on_delivery(shared_error, msg)
-            except Exception as e:
-                logger.error("Buffer for %s: Error while executing callback: %s", owner, e)
-            finally:
-                buffer.clear()
+            cb_thread = DeliveryCallbackThread(owner, buffer.copy(), shared_error)
+            cb_thread.start()
+            buffer.clear()
         buffer_elapsed_time = 0
         buffer_loop_no += 1
+
+
+class DeliveryCallbackThread(Thread):
+    """Thread that executes delivery callback for each message in the buffer."""
+
+    def __init__(self, owner: str, messages: list[KMessage], shared_error: Optional[confluent_kafka.KafkaError]) -> None:
+        """Initialize the delivery callback thread.
+
+        :param owner: KProducer's id that owns the message buffer.
+        :param messages: List of KMessage instances to call on_delivery callback.
+        :param shared_error: Shared error for all messages in the buffer.
+        """
+        Thread.__init__(self, name=f"delivery_callback_thread_{id(self)}", daemon=True)
+        self._owner = owner
+        self._messages = messages
+        self._shared_error = shared_error
+
+    def run(self) -> None:
+        logger.debug("Delivery Callback Thread for %s: run started", self._owner)
+        try:
+            for msg in self._messages:
+                if msg.on_delivery:
+                    msg.on_delivery(self._shared_error, msg)
+        except Exception as e:
+            logger.error("Delivery Callback Thread %s: Error while executing callback: %s", self._owner, e)
