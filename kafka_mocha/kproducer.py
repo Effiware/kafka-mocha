@@ -38,7 +38,7 @@ class KProducer:
         self.logger = get_custom_logger(loglevel)
         self._transactional_id = config.get("transactional.id")
         self._max_retry_count = config.get("retries", config.get("message.send.max.retries", 6))
-        self._retry_backoff = config.get("retry.backoff.ms", 20) / 1000  # in seconds
+        self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
         self.buffer = []
         buffer_max_len = config.get("queue.buffering.max.messages", 1000)
