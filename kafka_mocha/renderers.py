@@ -1,12 +1,12 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from functools import reduce
 from pathlib import Path
 from platform import system
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from jinja2 import Environment, FileSystemLoader
 
-from kafka_mocha.models import KTopic
+from kafka_mocha.kmodels import KTopic
 
 INTERNAL_TOPICS = [
     "__consumer_offsets",
@@ -28,7 +28,7 @@ def _prepare_records(topics: list[KTopic]) -> list[dict[str, Any]]:
                 "name": topic.name,
                 "messages": sorted(
                     reduce(lambda x, y: x + y, [partition._heap for partition in topic.partitions], []),
-                    key=lambda x: x[5][1],
+                    key=lambda x: x.timestamp()[1],
                 ),
             }
         )

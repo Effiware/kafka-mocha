@@ -147,14 +147,14 @@
                 </tr>
                 </thead>
                 <tbody>
-                {% for message in topic.messages if include_markers or not message.7 %}
+                {% for message in topic.messages if include_markers or not message._marker %}
                     <tr>
-                        <td>{{ message.5.1 }}</td>
-                        <td>{{ message.1 }}</td>
-                        <td>{{ message.8 }}</td>
-                        <td>{{ message.2 }}</td>
-                        <td>{{ message.3 }}</td>
-                        <td>{{ message.4 }}</td>
+                        <td>{{ message.timestamp()[1] }}</td>
+                        <td>{{ message.partition() }}</td>
+                        <td>{{ message.offset() }}</td>
+                        <td>{{ message.key() }}</td>
+                        <td>{{ message.value(None) }}</td>
+                        <td>{{ message.headers() }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>

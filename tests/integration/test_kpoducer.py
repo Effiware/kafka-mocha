@@ -63,7 +63,13 @@ def test_kafka_simulator_received_messages__long_running_task(kafka, kproducer):
     no_msg_to_produce = 100
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.3)
-        kproducer.produce("topic-1", f"key-{idx}".encode(), "value".encode(), on_delivery=lambda *_: None)
+        kproducer.produce(
+            "topic-1",
+            f"key-{idx}".encode(),
+            "value".encode(),
+            headers=[(f"hkey-{idx}", b"hvalue")],
+            on_delivery=lambda *_: None,
+        )
 
     kproducer._done()
 

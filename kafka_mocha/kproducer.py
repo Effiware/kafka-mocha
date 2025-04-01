@@ -4,13 +4,13 @@ from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
 from typing import Any, Literal, Optional
 
-from confluent_kafka import KafkaError, KafkaException, TopicPartition
+import confluent_kafka
 
 from kafka_mocha.buffer_handler import buffer_handler
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
 from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.models import PMessage
+from kafka_mocha.kmodels import KMessage
 from kafka_mocha.signals import KMarkers, KSignals, Tick
 from kafka_mocha.ticking_thread import TickingThread
 from kafka_mocha.utils import validate_config
@@ -41,13 +41,12 @@ class KProducer:
         self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
         self.buffer = []
-        buffer_len = config.get("queue.buffering.max.messages", 5)
-        buffer_len = MAX_BUFFER_LEN if buffer_len == 0 else buffer_len
+        buffer_max_len = config.get("queue.buffering.max.messages", 1000)
         buffer_max_ms = config.get("linger.ms", config.get("queue.buffering.max.ms", 300))
         self._buffer_handler = buffer_handler(
             f"KProducer({id(self)})",
             self.buffer,
-            buffer_len,
+            buffer_max_len,
             buffer_max_ms,
             transact=self._transactional_id is not None,
         )
@@ -65,7 +64,7 @@ class KProducer:
 
         key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.ABORT.value})
         value = str({"producerId": id(self), "markerType": KMarkers.ABORT.value})
-        message = PMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
+        message = KMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
         self._send_with_retry(message)
 
     def begin_transaction(self):
@@ -80,7 +79,7 @@ class KProducer:
 
         key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.COMMIT.value})
         value = str({"producerId": id(self), "markerType": KMarkers.COMMIT.value})
-        message = PMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
+        message = KMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
         self._send_with_retry(message)
 
     def flush(self, timeout: Optional[float] = None):
@@ -100,9 +99,9 @@ class KProducer:
     def init_transactions(self):
         """Duck type for confluent_kafka/cimpl.py::init_transactions (see signature there)."""
         if self._transactional_id is None:
-            raise KafkaException(
-                KafkaError(
-                    KafkaError._NOT_CONFIGURED,
+            raise confluent_kafka.KafkaException(
+                confluent_kafka.KafkaError(
+                    confluent_kafka.KafkaError._NOT_CONFIGURED,
                     "The Transactional API requires transactional.id to be configured",
                     fatal=True,
                 )
@@ -144,19 +143,11 @@ class KProducer:
 
         Instead of producing a real message to Kafka, it is sent to Kafka Simulator.
         """
-        message = PMessage.from_producer_data(
-            topic=topic,
-            partition=partition,
-            key=key,
-            value=value,
-            timestamp=timestamp,
-            headers=headers,
-            on_delivery=on_delivery,
-        )
+        message = KMessage(topic, partition, key, value, headers, timestamp, on_delivery=on_delivery)
         self._send_with_retry(message)
 
     def send_offsets_to_transaction(
-        self, positions: list[TopicPartition], group_metadata: object, timeout: float = None
+        self, positions: list[confluent_kafka.TopicPartition], group_metadata: object, timeout: float = None
     ):
         raise NotImplementedError("Not yet implemented...")
 
@@ -211,7 +202,7 @@ class KProducer:
                 sleep(remaining_time)
         return result
 
-    def _send_with_retry(self, message: PMessage) -> None:
+    def _send_with_retry(self, message: KMessage) -> None:
         """Send message to buffer handler with retry mechanism."""
         count = 0
         while count < self._max_retry_count:
