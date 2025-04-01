@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from jinja2 import Environment, FileSystemLoader
 
-from kafka_mocha.models import KTopic
+from kafka_mocha.kmodels import KTopic
 
 INTERNAL_TOPICS = [
     "__consumer_offsets",

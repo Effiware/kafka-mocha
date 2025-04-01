@@ -3,7 +3,6 @@ from inspect import GEN_SUSPENDED, getgeneratorstate
 
 from kafka_mocha.kmodels import KMessage
 from kafka_mocha.kproducer import KProducer
-from kafka_mocha.models import PMessage
 
 
 def test_kproducers_buffer_is_primed(kproducer) -> None:

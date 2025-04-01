@@ -2,4 +2,5 @@
 # copied from the Confluent Schema Registry Python client, Confluent Inc. The original code can be found at:
 # https://github.com/confluentinc/confluent-kafka-python/tree/master/src/confluent_kafka/schema_registry
 
+from kafka_mocha.schema_registry.mock_schema_registry_client import MockSchemaRegistryClient
 from kafka_mocha.schema_registry.wrappers import mock_schema_registry

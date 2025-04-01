@@ -2,7 +2,6 @@
 omit =
     */schema_registry/schema_registry_client.py
     */schema_registry/mock_schema_registry_client.py
-    */models.py
 
 [report]
 exclude_lines =
