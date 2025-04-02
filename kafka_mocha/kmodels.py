@@ -215,7 +215,9 @@ class KMessage:
         if self._headers:
             for header in self._headers:
                 header_acc += len(header[0]) + len(header[1])
-        return len(self._key) + len(self._value) + header_acc
+        key_acc = len(self._key) if self._key else 0
+        value_acc = len(self._value) if self._value else 0
+        return key_acc + value_acc + header_acc
 
 
 class KPartition:

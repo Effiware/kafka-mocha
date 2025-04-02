@@ -45,7 +45,7 @@ def test_kafka_simulator_received_messages__medium_running_task(kafka, kproducer
     no_msg_to_produce = 1000
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.01)
-        kproducer.produce("topic-1", f"key-{idx}".encode(), "value".encode())
+        kproducer.produce("topic-1", value=f"value-{idx}".encode())
 
     kproducer._done()
 
