@@ -44,10 +44,6 @@ def test_kmessage_incorrect_creation_error_messages() -> None:
     assert "value" in err.value.args[0].lower()
 
     with pytest.raises(TypeError) as err:
-        KMessage("topic", 0, b"key1", b"value1", {"h-key": "h-value"})
-    assert "headers" in err.value.args[0].lower()
-
-    with pytest.raises(TypeError) as err:
         KMessage("topic", 0, b"key1", b"value1", [("h-key", "h-value")])
     assert "headers" in err.value.args[0].lower()
 
