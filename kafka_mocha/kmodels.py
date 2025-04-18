@@ -30,7 +30,9 @@ class KMessage:
         key: Optional[str | bytes] = None,
         value: Optional[str | bytes] = None,
         headers: (
-            Optional[list[tuple[str, bytes]]] | Optional[tuple[tuple[str, bytes], ...]] | Optional[dict[str, str]]
+            Optional[list[tuple[str, bytes]]]
+            | Optional[tuple[tuple[str, bytes], ...]]
+            | Optional[dict[str, str | bytes | None]]
         ) = None,
         timestamp: int | tuple[int, int] = (-1, confluent_kafka.TIMESTAMP_CREATE_TIME),
         *,
@@ -96,9 +98,8 @@ class KMessage:
             for key, val in headers.items():
                 if not isinstance(key, str):
                     raise TypeError("Message's header's key must be a string")
-                if not isinstance(val, str):
-                    raise TypeError("Message's header's value must be a string")
-
+                if val is not None and not isinstance(val, (str, bytes)):
+                    raise TypeError("Message's header's value must be a string or bytes or None")
         else:
             raise TypeError("Message's headers must be a list or tuple")
 
