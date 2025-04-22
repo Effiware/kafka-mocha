@@ -225,7 +225,8 @@ class KMessage:
         header_acc = 0
         if self._headers:
             if isinstance(self._headers, dict):
-                header_acc += len(self._headers)
+                for k, v in self._headers.items():
+                    header_acc += len(k) + len(v)
             else:
                 for header in self._headers:
                     header_acc += len(header[0]) + len(header[1])
