@@ -29,7 +29,11 @@ class KMessage:
         partition: Optional[int] = None,
         key: Optional[str | bytes] = None,
         value: Optional[str | bytes] = None,
-        headers: Optional[list[tuple[str, bytes]]] | Optional[tuple[tuple[str, bytes], ...]] = None,
+        headers: (
+            Optional[list[tuple[str, bytes]]]
+            | Optional[tuple[tuple[str, bytes], ...]]
+            | Optional[dict[str, str | bytes | None]]
+        ) = None,
         timestamp: int | tuple[int, int] = (-1, confluent_kafka.TIMESTAMP_CREATE_TIME),
         *,
         offset: Optional[int] = None,
@@ -89,6 +93,13 @@ class KMessage:
                     raise TypeError("Message's headers' keys must be strings")
                 if not isinstance(header[1], bytes):
                     raise TypeError("Message's headers' values must be bytes")
+
+        elif isinstance(headers, dict):
+            for key, val in headers.items():
+                if not isinstance(key, str):
+                    raise TypeError("Message's header's key must be a string")
+                if val is not None and not isinstance(val, (str, bytes)):
+                    raise TypeError("Message's header's value must be a string or bytes or None")
         else:
             raise TypeError("Message's headers must be a list or tuple")
 
@@ -213,8 +224,12 @@ class KMessage:
     def __len__(self, *args, **kwargs) -> int:
         header_acc = 0
         if self._headers:
-            for header in self._headers:
-                header_acc += len(header[0]) + len(header[1])
+            if isinstance(self._headers, dict):
+                for k, v in self._headers.items():
+                    header_acc += len(k) + len(v)
+            else:
+                for header in self._headers:
+                    header_acc += len(header[0]) + len(header[1])
         key_acc = len(self._key) if self._key else 0
         value_acc = len(self._value) if self._value else 0
         return key_acc + value_acc + header_acc
