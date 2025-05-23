@@ -88,7 +88,4 @@ def kconsumer(kafka):
     """Returns KConsumer instance."""
     import kafka_mocha.kconsumer as kc
 
-    return kc.KConsumer({
-        "bootstrap.servers": "localhost:9092",
-        "group.id": "test-group"
-    })
+    return kc.KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})

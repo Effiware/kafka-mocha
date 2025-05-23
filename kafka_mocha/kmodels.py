@@ -251,19 +251,23 @@ class KPartition:
     def seek(self, offset: int) -> int:
         """
         Seek to a specific offset in the partition.
-        
+
         :param offset: The offset to seek to (0-based)
         :returns: The actual starting index for iteration (bounded by partition size)
         :raises ValueError: If offset is negative
         """
         if offset < 0:
             raise ValueError("Offset must be non-negative")
-        
+
         # Return the actual index to start reading from (bounded by partition size)
         return min(offset, len(self._heap))
 
     def __len__(self) -> int:
         return len(self._heap)
+
+    def __getitem__(self, index: int) -> KMessage:
+        """Make KPartition subscriptable for accessing messages by index."""
+        return self._heap[index]
 
 
 class KTopic:
@@ -288,6 +292,7 @@ class KTopic:
 
 class KConsumerAssignment(NamedTuple):
     """Consumer assignment information."""
+
     consumer_id: int
     topic: str
     partition: int
@@ -295,24 +300,24 @@ class KConsumerAssignment(NamedTuple):
 
 class KConsumerGroup:
     """Consumer group information and management."""
-    
+
     def __init__(self, group_id: str):
         self.group_id = group_id
         self.members: dict[int, set[str]] = {}  # consumer_id -> set of subscribed topics
         self.assignments: list[KConsumerAssignment] = []  # list of consumer-partition assignments
         self.offsets: dict[str, dict[int, int]] = {}  # topic -> partition -> offset
-        
+
     def add_member(self, consumer_id: int, topics: list[str]) -> None:
         """Add a consumer to the group with its topic subscriptions."""
         self.members[consumer_id] = set(topics)
-        
+
     def remove_member(self, consumer_id: int) -> None:
         """Remove a consumer from the group."""
         if consumer_id in self.members:
             del self.members[consumer_id]
             # Remove assignments for this consumer
             self.assignments = [a for a in self.assignments if a.consumer_id != consumer_id]
-            
+
     def get_member_assignment(self, consumer_id: int) -> list[TopicPartition]:
         """Get the topic partitions assigned to a specific consumer."""
         result = []
@@ -320,30 +325,29 @@ class KConsumerGroup:
             if assignment.consumer_id == consumer_id:
                 # Get the committed offset for this partition if available
                 offset = -1
-                if (assignment.topic in self.offsets and 
-                    assignment.partition in self.offsets[assignment.topic]):
+                if assignment.topic in self.offsets and assignment.partition in self.offsets[assignment.topic]:
                     offset = self.offsets[assignment.topic][assignment.partition]
-                    
+
                 result.append(TopicPartition(assignment.topic, assignment.partition, offset))
         return result
-    
+
     def is_member(self, consumer_id: int) -> bool:
         """Check if a consumer is a member of this group."""
         return consumer_id in self.members
-    
+
     def update_offsets(self, offsets: list[TopicPartition]) -> None:
         """Update the committed offsets for this group."""
         for tp in offsets:
             if tp.topic not in self.offsets:
                 self.offsets[tp.topic] = {}
             self.offsets[tp.topic][tp.partition] = tp.offset
-            
+
     def get_offset(self, topic: str, partition: int) -> int:
         """Get the committed offset for a topic partition."""
         if topic in self.offsets and partition in self.offsets[topic]:
             return self.offsets[topic][partition]
         return -1  # Indicates no committed offset
-    
+
     def rebalance(self, available_topics: list[KTopic]) -> dict[int, list[TopicPartition]]:
         """
         Rebalance the consumer group assigning partitions to consumers.
@@ -351,17 +355,17 @@ class KConsumerGroup:
         """
         # Clear current assignments
         self.assignments = []
-        
+
         # Get all topic partitions that any member is subscribed to
         all_topic_partitions = []
         for topic in available_topics:
             if any(topic.name in subscribed_topics for subscribed_topics in self.members.values()):
                 for partition_idx in range(len(topic.partitions)):
                     all_topic_partitions.append((topic.name, partition_idx))
-        
+
         # Sort for deterministic assignment
         all_topic_partitions.sort()
-        
+
         # Get consumers subscribed to each topic
         consumers_by_topic = {}
         for consumer_id, subscribed_topics in self.members.items():
@@ -369,32 +373,30 @@ class KConsumerGroup:
                 if topic_name not in consumers_by_topic:
                     consumers_by_topic[topic_name] = []
                 consumers_by_topic[topic_name].append(consumer_id)
-        
+
         # Sort consumers for deterministic assignment
         for topic_name in consumers_by_topic:
             consumers_by_topic[topic_name].sort()
-        
+
         # Assign partitions using a simple round-robin strategy
         assignments = {consumer_id: [] for consumer_id in self.members}
-        
+
         for topic_name, partition_idx in all_topic_partitions:
             if topic_name in consumers_by_topic and consumers_by_topic[topic_name]:
                 consumers = consumers_by_topic[topic_name]
                 # Choose consumer using round-robin
                 consumer_idx = abs(hash(f"{topic_name}-{partition_idx}")) % len(consumers)
                 consumer_id = consumers[consumer_idx]
-                
+
                 # Get committed offset for this partition
                 offset = self.get_offset(topic_name, partition_idx)
-                
+
                 # Create assignment
-                self.assignments.append(KConsumerAssignment(
-                    consumer_id=consumer_id,
-                    topic=topic_name,
-                    partition=partition_idx
-                ))
-                
+                self.assignments.append(
+                    KConsumerAssignment(consumer_id=consumer_id, topic=topic_name, partition=partition_idx)
+                )
+
                 # Add to result
                 assignments[consumer_id].append(TopicPartition(topic_name, partition_idx, offset))
-        
+
         return assignments

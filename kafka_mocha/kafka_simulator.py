@@ -12,7 +12,7 @@ from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMeta
 from kafka_mocha.exceptions import (
     KafkaSimulatorBootstrapException,
     KafkaSimulatorProcessingException,
-    KConsumerGroupException
+    KConsumerGroupException,
 )
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.kmodels import KConsumerGroup, KMessage, KTopic
@@ -72,15 +72,15 @@ class KafkaSimulator:
         self.topics.append(KTopic("_schemas"))  # Built-in `_schemas` topic
         self.topics.append(KTopic("__consumer_offsets"))  # Built-in `__consumer_offsets` topic
         self._registered_transact_ids: dict[str, list[ProducerAndState]] = defaultdict(list)  # Epoch is list length
-        
+
         # Consumer group management
         self._consumer_groups: dict[str, KConsumerGroup] = {}
         self._consumer_2_group: dict[int, str] = {}  # consumer_id -> group_id mapping
-        
+
         # Start handlers
         self.producers_handler = self.handle_producers()
         self.producers_handler.send(KSignals.INIT.value)
-        
+
         self.consumers_handler = self.handle_consumers()
         self.consumers_handler.send(KSignals.INIT.value)
 
@@ -314,54 +314,54 @@ class KafkaSimulator:
         logger.info("Handle consumers has been primed")
         while True:
             request = yield KSignals.SUCCESS
-            
+
             if isinstance(request, TopicPartition):
                 # Handle a seek request
                 topic_name = request.topic
                 partition_id = request.partition
                 offset = request.offset
-                
+
                 # Find the topic
                 topic = next((t for t in self.topics if t.name == topic_name), None)
                 if topic is None:
                     logger.warning("Seek request for unknown topic: %s", topic_name)
                     continue
-                    
+
                 # Process the request
                 logger.debug("Consumer seeking to offset %d for %s[%d]", offset, topic_name, partition_id)
                 # Actual seek logic is handled in the consumer since we just return messages
-                
+
             elif isinstance(request, tuple) and len(request) == 3:
                 # Handle a poll request: (consumer_id, topic_partitions, max_records)
                 consumer_id, topic_partitions, max_records = request
-                
+
                 # Get all messages for the requested partitions
                 messages = []
                 for tp in topic_partitions:
                     topic = next((t for t in self.topics if t.name == tp.topic), None)
                     if topic is None or tp.partition >= len(topic.partitions):
                         continue
-                        
+
                     partition = topic.partitions[tp.partition]
                     start_idx = 0
-                    
+
                     # If an offset is specified, find the starting point
                     if tp.offset > -1:
                         start_idx = partition.seek(tp.offset)
-                    
+
                     # Get messages from the partition
                     for i in range(start_idx, len(partition)):
                         if len(messages) >= max_records:
                             break
                         messages.append(partition[i])
-                
+
                 logger.debug("Consumer %d polling, found %d messages", consumer_id, len(messages))
                 yield messages
-            
+
             else:
                 logger.warning("Unknown request type in consumer handler: %s", type(request))
                 yield []
-                
+
     def register_consumer(self, consumer_id: int, group_id: str, topics: list[str]) -> None:
         """
         Register a consumer with a consumer group.
@@ -369,37 +369,37 @@ class KafkaSimulator:
         :todo: Add regex support for topic names
         """
         logger.debug("Registering consumer %d with group %s, topics: %s", consumer_id, group_id, topics)
-        
+
         # Create the consumer group if it doesn't exist
         if group_id not in self._consumer_groups:
             self._consumer_groups[group_id] = KConsumerGroup(group_id)
-        
+
         # Add or update the consumer in the group
         self._consumer_groups[group_id].add_member(consumer_id, topics)
         self._consumer_2_group[consumer_id] = group_id
-        
+
         # Trigger a rebalance for the group
         self._rebalance_and_notify(group_id)
-    
+
     def unregister_consumer(self, consumer_id: int) -> None:
         """Unregister a consumer from its consumer group."""
         if consumer_id in self._consumer_2_group:
             group_id = self._consumer_2_group[consumer_id]
             logger.debug("Unregistering consumer %d from group %s", consumer_id, group_id)
-            
+
             # Remove the consumer from the group
             if group_id in self._consumer_groups:
                 self._consumer_groups[group_id].remove_member(consumer_id)
-                
+
                 # Trigger a rebalance for the group if there are still members
                 if self._consumer_groups[group_id].members:
                     self._rebalance_and_notify(group_id)
             else:
                 logger.warning("Consumer group %s not found for consumer %d", group_id, consumer_id)
-                    
+
             # Remove the mapping
             del self._consumer_2_group[consumer_id]
-            
+
     def _rebalance_and_notify(self, group_id: str) -> None:
         """
         Rebalance a consumer group and notify consumers of their new assignments.
@@ -411,103 +411,105 @@ class KafkaSimulator:
         if group_id not in self._consumer_groups:
             logger.warning("Consumer group %s not found for rebalance", group_id)
             return
-            
+
         consumer_group = self._consumer_groups[group_id]
         if not consumer_group.members:
             return
-            
+
         logger.debug("Running full rebalance for consumer group %s", group_id)
         # Get the old assignments for each consumer
         old_assignments = {}
         for consumer_id in consumer_group.members:
             old_assignments[consumer_id] = consumer_group.get_member_assignment(consumer_id)
-            
+
         # Compute new assignments
         new_assignments = consumer_group.rebalance(self.topics)
-        
+
         # For each consumer, determine what partitions were revoked and what was assigned
         for consumer_id in consumer_group.members:
             old_tps = old_assignments.get(consumer_id, [])
             new_tps = new_assignments.get(consumer_id, [])
-            
+
             # Identify revoked partitions
             revoked_tps = [
-                tp for tp in old_tps 
+                tp
+                for tp in old_tps
                 if not any(ntp.topic == tp.topic and ntp.partition == tp.partition for ntp in new_tps)
             ]
-            
+
             # Identify assigned partitions
             assigned_tps = [
-                tp for tp in new_tps 
+                tp
+                for tp in new_tps
                 if not any(otp.topic == tp.topic and otp.partition == tp.partition for otp in old_tps)
             ]
-            
+
             logger.debug("Consumer %d: revoked=%s, assigned=%s", consumer_id, revoked_tps, assigned_tps)
             # The actual notification of consumers is done through the KConsumer.subscribe method
             # which will query for its assignment
-    
+
     def assign_partitions(self, consumer_id: int, partitions: list[TopicPartition]) -> None:
         """Manually assign partitions to a consumer (outside of consumer groups)."""
         # For manual partition assignment, we don't involve consumer groups
         logger.debug("Manually assigning partitions to consumer %d: %s", consumer_id, partitions)
-    
+
     def commit_offsets(self, consumer_id: int, offsets: list[TopicPartition]) -> None:
         """Commit offsets for a consumer."""
         if consumer_id in self._consumer_2_group:
             group_id = self._consumer_2_group[consumer_id]
             logger.debug("Committing offsets for consumer %d in group %s: %s", consumer_id, group_id, offsets)
-            
+
             if group_id in self._consumer_groups:
                 self._consumer_groups[group_id].update_offsets(offsets)
-                
+
                 # Store the offsets in the __consumer_offsets topic
                 self._store_consumer_offsets(group_id, offsets)
-    
+
     def _store_consumer_offsets(self, group_id: str, offsets: list[TopicPartition]) -> None:
         """Store consumer group offsets in the __consumer_offsets topic."""
         offset_topic = next((t for t in self.topics if t.name == "__consumer_offsets"), None)
         if offset_topic is None:
             logger.error("__consumer_offsets topic not found, this should not happen")
             return
-            
+
         # In a real Kafka cluster, offsets would be stored with specific keys and formats
         # For our simulator, we'll store them as simple messages
         for tp in offsets:
             key = f"{group_id}:{tp.topic}:{tp.partition}"
             value = str(tp.offset).encode()
             partition = abs(hash(key)) % len(offset_topic.partitions)
-            
+
             message = KMessage("__consumer_offsets", partition, key.encode(), value)
-            
+
             # Use the producers handler to store the message
             if getgeneratorstate(self.producers_handler) == GEN_SUSPENDED:
                 self.producers_handler.send(message)
             else:
                 raise KafkaSimulatorProcessingException("Producers handler is not in a suspended state")
-    
+
     def get_committed_offsets(self, consumer_id: int, partitions: list[TopicPartition]) -> list[TopicPartition]:
         """Get committed offsets for a consumer."""
         result = []
-        
+
         if consumer_id in self._consumer_2_group:
             group_id = self._consumer_2_group[consumer_id]
             logger.debug("Getting committed offsets for consumer %d in group %s", consumer_id, group_id)
-            
+
             if group_id in self._consumer_groups:
                 for tp in partitions:
                     offset = self._consumer_groups[group_id].get_offset(tp.topic, tp.partition)
                     result.append(TopicPartition(tp.topic, tp.partition, offset))
-        
+
         return result
-    
+
     def _rebalance_group(self, group_id: str) -> dict[int, list[TopicPartition]]:
         """Rebalance a consumer group and return the new assignments."""
         if group_id not in self._consumer_groups:
             return {}
-            
+
         logger.debug("Rebalancing consumer group %s", group_id)
         return self._consumer_groups[group_id].rebalance(self.topics)
-    
+
     def get_member_assignment(self, consumer_id: int) -> list[TopicPartition]:
         """Get the current assignment for a consumer."""
         if consumer_id in self._consumer_2_group:

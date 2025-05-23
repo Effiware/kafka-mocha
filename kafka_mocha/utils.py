@@ -164,6 +164,7 @@ consumer_config_schema = {
     "offset_commit_cb": {"type": Callable, "args": 1},
     "enable.partition.eof": {"type": bool, "allowed": [True, False]},
     "check.crcs": {"type": bool, "allowed": [True, False]},
+    "retries": {"type": int, "range": (0, 2147483647)},
 }
 
 
@@ -273,15 +274,13 @@ def validate_consumer_config(config) -> None:
     """
     # Check for required group.id for most use cases
     if "group.id" not in config:
-        raise KafkaClientBootstrapException(
-            "Configuration validation errors: group.id is required for KConsumer"
-        )
-        
+        raise KafkaClientBootstrapException("Configuration validation errors: group.id is required for KConsumer")
+
     # Auto-commit related checks
     enable_auto_commit = config.get("enable.auto.commit", True)
     auto_commit_interval_ms = config.get("auto.commit.interval.ms", 5000)
     enable_auto_offset_store = config.get("enable.auto.offset.store", True)
-    
+
     # Validate auto_commit_interval_ms when auto commit is enabled
     if enable_auto_commit:
         # Check if auto_commit_interval_ms is an int and is positive
@@ -289,12 +288,12 @@ def validate_consumer_config(config) -> None:
             raise KafkaClientBootstrapException(
                 "Configuration validation errors: auto.commit.interval.ms must be a positive integer when enable.auto.commit is True"
             )
-        
+
     # Validate combination of auto offset store and auto commit
     if not enable_auto_offset_store and not enable_auto_commit:
         # This is allowed but requires explicit calls to store_offsets() and commit()
         pass
-    
+
     _validate_against_schema(consumer_config_schema, config)
 
 

@@ -69,7 +69,7 @@ def test_kafka_simulator_received_messages__long_running_task(kafka, kproducer):
             f"key-{idx}".encode(),
             "value".encode(),
             headers=[(f"hkey-{idx}", b"hvalue")],
-            on_delivery=lambda err, msg: print(f"Error: {err}") if err else print(f"Message delivered: {msg.offset()}")
+            on_delivery=lambda err, msg: print(f"Error: {err}") if err else print(f"Message delivered: {msg.offset()}"),
         )
 
     kproducer._done()

@@ -186,7 +186,9 @@ def buffer_handler(
 class DeliveryCallbackThread(Thread):
     """Thread that executes delivery callback for each message in the buffer."""
 
-    def __init__(self, owner: str, messages: list[KMessage], shared_error: Optional[confluent_kafka.KafkaError]) -> None:
+    def __init__(
+        self, owner: str, messages: list[KMessage], shared_error: Optional[confluent_kafka.KafkaError]
+    ) -> None:
         """Initialize the delivery callback thread.
 
         :param owner: KProducer's id that owns the message buffer.
