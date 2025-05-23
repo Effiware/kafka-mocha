@@ -1,13 +1,37 @@
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from unittest.mock import MagicMock, patch
 
-import confluent_kafka
 import pytest
+from confluent_kafka import KafkaError, KafkaException, TopicPartition
 
-from kafka_mocha.core.kafka_simulator import KafkaSimulator
-from kafka_mocha.core.kconsumer import KConsumer
-from kafka_mocha.exceptions import KafkaClientBootstrapException, KConsumerMaxRetryException
-from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.kafka_simulator import KafkaSimulator
+from kafka_mocha.kconsumer import KConsumer
+from kafka_mocha.kmodels import KMessage
+
+
+@pytest.fixture()
+def kconsumer(kafka):
+    """Returns KConsumer instance."""
+    return KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
+
+
+@pytest.fixture()
+def kconsumer_with_subscription(kafka):
+    """Returns KConsumer instance with a subscription."""
+    consumer = KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
+    consumer.subscribe(["test-topic"])
+    return consumer
+
+
+@pytest.fixture()
+def kconsumer_with_assignment(kafka):
+    """Returns KConsumer instance with manual assignment."""
+    consumer = KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
+    consumer.assign([TopicPartition("test-topic", 0)])
+    return consumer
+
+
+# Basic Initialization Tests
 
 
 def test_kconsumer_initialization(kconsumer) -> None:
@@ -22,6 +46,8 @@ def test_kconsumer_initialization(kconsumer) -> None:
 
 def test_kconsumer_requires_group_id() -> None:
     """Test that KConsumer requires a group.id."""
+    from kafka_mocha.exceptions import KafkaClientBootstrapException
+
     with pytest.raises(KafkaClientBootstrapException) as exc:
         KConsumer({"bootstrap.servers": "localhost:9092"})
 
@@ -59,10 +85,11 @@ def test_kconsumer_validates_auto_offset_reset(kafka) -> None:
 
 def test_kconsumer_subscribe(kconsumer, monkeypatch) -> None:
     """Test subscription to topics."""
-
     # Mock get_member_assignment to return a test assignment
+    from confluent_kafka import TopicPartition
+
     def mock_get_member_assignment(self, consumer_id):
-        return [confluent_kafka.TopicPartition("test-topic", 0)]
+        return [TopicPartition("test-topic", 0)]
 
     monkeypatch.setattr(KafkaSimulator, "get_member_assignment", mock_get_member_assignment)
 
@@ -87,7 +114,7 @@ def test_kconsumer_unsubscribe(kconsumer_with_subscription) -> None:
 
 def test_kconsumer_assign(kconsumer) -> None:
     """Test manual partition assignment."""
-    partitions = [confluent_kafka.TopicPartition("test-topic", 0), confluent_kafka.TopicPartition("test-topic", 1)]
+    partitions = [TopicPartition("test-topic", 0), TopicPartition("test-topic", 1)]
 
     kconsumer.assign(partitions)
     assert len(kconsumer._assignment) == 2
@@ -117,7 +144,7 @@ def test_kconsumer_incremental_assign(kconsumer_with_assignment) -> None:
     initial_assignment_len = len(kconsumer_with_assignment._assignment)
 
     # Add a new partition incrementally
-    kconsumer_with_assignment.incremental_assign([confluent_kafka.TopicPartition("test-topic", 1)])
+    kconsumer_with_assignment.incremental_assign([TopicPartition("test-topic", 1)])
 
     # Check that assignment grew by 1
     assert len(kconsumer_with_assignment._assignment) == initial_assignment_len + 1
@@ -133,7 +160,7 @@ def test_kconsumer_incremental_assign(kconsumer_with_assignment) -> None:
 def test_kconsumer_incremental_unassign(kconsumer_with_assignment) -> None:
     """Test incremental unassignment."""
     # First add another partition
-    kconsumer_with_assignment.incremental_assign([confluent_kafka.TopicPartition("test-topic", 1)])
+    kconsumer_with_assignment.incremental_assign([TopicPartition("test-topic", 1)])
     assert len(kconsumer_with_assignment._assignment) == 2
 
     # Then remove one partition incrementally
@@ -170,12 +197,12 @@ def test_kconsumer_commit(kconsumer_with_assignment) -> None:
     assert commit_result is None
 
     # Test committing with specific offsets
-    offsets_to_commit = [confluent_kafka.TopicPartition("test-topic", 0, 300)]
+    offsets_to_commit = [TopicPartition("test-topic", 0, 300)]
     commit_result = kconsumer_with_assignment.commit(offsets=offsets_to_commit)
     assert commit_result is None
 
     # Test synchronous commit
-    offsets_to_commit = [confluent_kafka.TopicPartition("test-topic", 0, 400)]
+    offsets_to_commit = [TopicPartition("test-topic", 0, 400)]
     commit_result = kconsumer_with_assignment.commit(offsets=offsets_to_commit, asynchronous=False)
     assert commit_result is not None
     assert len(commit_result) == 1
@@ -188,10 +215,10 @@ def test_kconsumer_store_offsets(kafka) -> None:
     """Test storing offsets."""
     # Create a consumer with default settings (auto.offset.store=True)
     consumer = KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
-    consumer.assign([confluent_kafka.TopicPartition("test-topic", 0)])
+    consumer.assign([TopicPartition("test-topic", 0)])
 
     # Enable auto.offset.store should cause store_offsets to fail
-    with pytest.raises(confluent_kafka.KafkaException) as exc:
+    with pytest.raises(KafkaException) as exc:
         consumer.store_offsets()
 
     # Check that an exception was raised with the expected message
@@ -202,7 +229,7 @@ def test_kconsumer_store_offsets(kafka) -> None:
         consumer2 = KConsumer(
             {"bootstrap.servers": "localhost:9092", "group.id": "test-group", "enable.auto.offset.store": False}
         )
-        consumer2.assign([confluent_kafka.TopicPartition("test-topic", 0)])
+        consumer2.assign([TopicPartition("test-topic", 0)])
 
         # Test storing with a message
         test_message = KMessage("test-topic", 0, b"key", b"value")
@@ -212,7 +239,7 @@ def test_kconsumer_store_offsets(kafka) -> None:
         assert consumer2._positions["test-topic"][0] == 201  # offset + 1
 
         # Test storing with specific offsets
-        offsets_to_store = [confluent_kafka.TopicPartition("test-topic", 0, 300)]
+        offsets_to_store = [TopicPartition("test-topic", 0, 300)]
         consumer2.store_offsets(offsets=offsets_to_store)
         assert consumer2._positions["test-topic"][0] == 300
 
@@ -223,7 +250,7 @@ def test_kconsumer_position(kconsumer_with_assignment) -> None:
     kconsumer_with_assignment._positions["test-topic"][0] = 100
 
     # Get positions
-    positions = kconsumer_with_assignment.position([confluent_kafka.TopicPartition("test-topic", 0)])
+    positions = kconsumer_with_assignment.position([TopicPartition("test-topic", 0)])
 
     assert len(positions) == 1
     assert positions[0].topic == "test-topic"
@@ -236,17 +263,29 @@ def test_kconsumer_committed(kconsumer_with_assignment, monkeypatch) -> None:
 
     # Mock get_committed_offsets to return test offsets
     def mock_get_committed_offsets(self, consumer_id, partitions):
-        return [confluent_kafka.TopicPartition(tp.topic, tp.partition, 100) for tp in partitions]
+        return [TopicPartition(tp.topic, tp.partition, 100) for tp in partitions]
 
     monkeypatch.setattr(KafkaSimulator, "get_committed_offsets", mock_get_committed_offsets)
 
     # Get committed offsets
-    committed_offsets = kconsumer_with_assignment.committed([confluent_kafka.TopicPartition("test-topic", 0)])
+    committed_offsets = kconsumer_with_assignment.committed([TopicPartition("test-topic", 0)])
 
     assert len(committed_offsets) == 1
     assert committed_offsets[0].topic == "test-topic"
     assert committed_offsets[0].partition == 0
     assert committed_offsets[0].offset == 100
+
+
+def test_kconsumer_seek(kconsumer_with_assignment) -> None:
+    """Test seeking to a specific offset."""
+    # Seek to a specific offset
+    kconsumer_with_assignment.seek(TopicPartition("test-topic", 0, 200))
+
+    # Check that position was updated
+    assert kconsumer_with_assignment._positions["test-topic"][0] == 200
+
+
+# Message Consumption Tests
 
 
 def test_kconsumer_poll_with_no_messages(kconsumer_with_assignment, monkeypatch) -> None:
@@ -402,7 +441,7 @@ def test_kconsumer_on_assign_callback(monkeypatch) -> None:
 
     # Mock get_member_assignment to return test assignments
     def mock_get_member_assignment(self, consumer_id):
-        return [confluent_kafka.TopicPartition("test-topic", 0)]
+        return [TopicPartition("test-topic", 0)]
 
     monkeypatch.setattr(KafkaSimulator, "get_member_assignment", mock_get_member_assignment)
 
@@ -420,7 +459,7 @@ def test_kconsumer_on_assign_callback(monkeypatch) -> None:
         args = on_assign_mock.call_args[0]
         assert args[0] == consumer
         assert isinstance(args[1], list)
-        assert all(isinstance(tp, confluent_kafka.TopicPartition) for tp in args[1])
+        assert all(isinstance(tp, TopicPartition) for tp in args[1])
 
 
 def test_kconsumer_on_revoke_callback(monkeypatch) -> None:
@@ -433,7 +472,7 @@ def test_kconsumer_on_revoke_callback(monkeypatch) -> None:
         consumer = KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
 
         # Manually set up assignment
-        consumer._assignment = [confluent_kafka.TopicPartition("test-topic", 0)]
+        consumer._assignment = [TopicPartition("test-topic", 0)]
 
         # Subscribe with the callback
         consumer.subscribe(["test-topic"], on_revoke=on_revoke_mock)
@@ -467,7 +506,7 @@ def test_kconsumer_fetch_with_retry_success(kconsumer_with_assignment, monkeypat
     monkeypatch.setattr(kconsumer_with_assignment._kafka_simulator, "consumers_handler", mock_generator)
 
     # Test the method
-    request = (id(kconsumer_with_assignment), [confluent_kafka.TopicPartition("test-topic", 0, 0)], 1)
+    request = (id(kconsumer_with_assignment), [TopicPartition("test-topic", 0, 0)], 1)
     messages = kconsumer_with_assignment._fetch_with_retry(request)
 
     assert len(messages) == 1
@@ -476,18 +515,19 @@ def test_kconsumer_fetch_with_retry_success(kconsumer_with_assignment, monkeypat
 
 def test_kconsumer_fetch_with_retry_max_retries(kconsumer_with_assignment, monkeypatch) -> None:
     """Test _fetch_with_retry raises exception when max retries exceeded."""
+    # Mock getgeneratorstate to always return a non-suspended state
+    from kafka_mocha.exceptions import KConsumerMaxRetryException
 
     def mock_getgeneratorstate(generator):
-        """Mock getgeneratorstate to always return a non-suspended state"""
         return "GEN_RUNNING"  # Not suspended
 
-    monkeypatch.setattr("kafka_mocha.core.kconsumer.getgeneratorstate", mock_getgeneratorstate)
+    monkeypatch.setattr("kafka_mocha.kconsumer.getgeneratorstate", mock_getgeneratorstate)
 
     # Set low retry count and backoff for fast testing
     kconsumer_with_assignment._max_retry_count = 2
     kconsumer_with_assignment._retry_backoff = 0.001
 
-    request = (id(kconsumer_with_assignment), [confluent_kafka.TopicPartition("test-topic", 0, 0)], 1)
+    request = (id(kconsumer_with_assignment), [TopicPartition("test-topic", 0, 0)], 1)
 
     with pytest.raises(KConsumerMaxRetryException) as exc_info:
         kconsumer_with_assignment._fetch_with_retry(request)
@@ -546,30 +586,32 @@ def test_kconsumer_update_positions_and_commit(kconsumer_with_assignment) -> Non
     assert kconsumer_with_assignment._positions["other-topic"][1] == 21  # Last offset + 1
 
 
-# def test_kconsumer_maybe_auto_commit(kconsumer_with_assignment, monkeypatch) -> None:
-#     """Test _maybe_auto_commit method."""
-#     # Set up positions
-#     kconsumer_with_assignment._positions = {"test-topic": {0: 100}, "other-topic": {1: 200}}
-#
-#     # Mock the kafka simulator's commit_offsets method
-#     commit_calls = []
-#
-#     def mock_commit_offsets(consumer_id, offsets):
-#         commit_calls.append((consumer_id, offsets))
-#
-#     # Test the method
-#     kconsumer_with_assignment._maybe_auto_commit()
-#
-#     # Verify commit was called with correct offsets
-#     assert len(commit_calls) == 1
-#     consumer_id, offsets = commit_calls[0]
-#     assert consumer_id == id(kconsumer_with_assignment)
-#     assert len(offsets) == 2
-#
-#     # Check that offsets contain our positions
-#     offset_tuples = [(tp.topic, tp.partition, tp.offset) for tp in offsets]
-#     assert ("test-topic", 0, 100) in offset_tuples
-#     assert ("other-topic", 1, 200) in offset_tuples
+def test_kconsumer_maybe_auto_commit(kconsumer_with_assignment, monkeypatch) -> None:
+    """Test _maybe_auto_commit method."""
+    # Set up positions
+    kconsumer_with_assignment._positions = {"test-topic": {0: 100}, "other-topic": {1: 200}}
+
+    # Mock the kafka simulator's commit_offsets method
+    commit_calls = []
+
+    def mock_commit_offsets(consumer_id, offsets):
+        commit_calls.append((consumer_id, offsets))
+
+    monkeypatch.setattr(kconsumer_with_assignment._kafka_simulator, "commit_offsets", mock_commit_offsets)
+
+    # Test the method
+    kconsumer_with_assignment._maybe_auto_commit()
+
+    # Verify commit was called with correct offsets
+    assert len(commit_calls) == 1
+    consumer_id, offsets = commit_calls[0]
+    assert consumer_id == id(kconsumer_with_assignment)
+    assert len(offsets) == 2
+
+    # Check that offsets contain our positions
+    offset_tuples = [(tp.topic, tp.partition, tp.offset) for tp in offsets]
+    assert ("test-topic", 0, 100) in offset_tuples
+    assert ("other-topic", 1, 200) in offset_tuples
 
 
 def test_kconsumer_consume_uses_abstraction(kconsumer_with_assignment, monkeypatch) -> None:

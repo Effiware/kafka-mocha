@@ -79,7 +79,7 @@ class KMessage:
     def _check_key_value(obj: Optional[str | bytes]):
         """Check that key/value is a string or bytes."""
         if obj is not None and not isinstance(obj, str) and not isinstance(obj, bytes):
-            raise TypeError(f"Message's key/value must be a string or bytes, got {type(obj).__name__}")
+            raise TypeError("Message's key/value must be a string or bytes")
 
     @staticmethod
     def _check_headers(headers):
@@ -243,24 +243,24 @@ class KPartition:
         self._heap: list[KMessage] = []
 
     def append(self, message: KMessage) -> None:
-        """Append a message to the partition."""
         self._heap.append(message)
 
-    def get_by_offset(self, offset: int = 0, batch_size: int = 1) -> list[KMessage]:
-        """Get messages starting from a specific (or the closest) offset ."""
-        found_idx = None
-        for idx, msq in enumerate(self._heap):
-            if msq.offset() is not None and msq.offset() >= offset:
-                found_idx = idx
-                break
+    def get(self, offset: int = 0, batch_size: int = 1) -> list[KMessage]:
+        return self._heap[offset:batch_size]
 
-        return self._heap[found_idx : found_idx + batch_size] if found_idx is not None else []
+    def seek(self, offset: int) -> int:
+        """
+        Seek to a specific offset in the partition.
 
-    def get_by_timestamp(self, timestamp: int, batch_size: int = 1) -> list[KMessage]:
-        """Get messages starting from a specific timestamp."""
-        raise NotImplementedError(
-            "Kafka Mocha is build using discrete-event simulation and does not support timestamp-based retrieval."
-        )
+        :param offset: The offset to seek to (0-based)
+        :returns: The actual starting index for iteration (bounded by partition size)
+        :raises ValueError: If offset is negative
+        """
+        if offset < 0:
+            raise ValueError("Offset must be non-negative")
+
+        # Return the actual index to start reading from (bounded by partition size)
+        return min(offset, len(self._heap))
 
     def __len__(self) -> int:
         return len(self._heap)
