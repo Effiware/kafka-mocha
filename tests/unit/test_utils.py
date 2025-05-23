@@ -196,7 +196,8 @@ def test_validate_producer_config_unhappy_path_transactional() -> None:
 def test_validate_consumer_config_happy_path(key: str, value: Any) -> None:
     """Test validate_consumer_config with valid configuration parameters."""
 
-    config = {key: value}
+    # Include group.id for all test cases since it's required
+    config = {"group.id": "test-group-id"} if key != "group.id" else {key: value}
     validate_consumer_config(config)
 
 
@@ -204,7 +205,8 @@ def test_validate_consumer_config_happy_path(key: str, value: Any) -> None:
 def test_validate_consumer_config_unhappy_path(key: str, value: Any) -> None:
     """Test validate_consumer_config with invalid configuration parameters."""
 
-    config = {key: value}
+    # Include group.id for all test cases except when testing group.id itself
+    config = {"group.id": "test-group-id", key: value} if key != "group.id" else {key: value}
     with pytest.raises(KafkaClientBootstrapException):
         validate_consumer_config(config)
 

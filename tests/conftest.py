@@ -81,3 +81,14 @@ def kproducer(kafka):
     import kafka_mocha.kproducer as kp
 
     return kp.KProducer({"bootstrap.servers": "localhost:9092"})
+
+
+@fixture()
+def kconsumer(kafka):
+    """Returns KConsumer instance."""
+    import kafka_mocha.kconsumer as kc
+
+    return kc.KConsumer({
+        "bootstrap.servers": "localhost:9092",
+        "group.id": "test-group"
+    })
