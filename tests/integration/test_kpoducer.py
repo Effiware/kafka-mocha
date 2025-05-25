@@ -4,7 +4,7 @@ from time import sleep
 import pytest
 from confluent_kafka import KafkaError, KafkaException
 
-from kafka_mocha.kproducer import KProducer
+from kafka_mocha.core.kproducer import KProducer
 
 
 def test_kproducer_returns_produced_messages_no__unhappy(kproducer) -> None:

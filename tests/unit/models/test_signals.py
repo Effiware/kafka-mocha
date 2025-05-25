@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from kafka_mocha.signals import KMarkers, KSignals, Tick
+from kafka_mocha.models.signals import KMarkers, KSignals, Tick
 
 
 @pytest.mark.parametrize("interval", [0, 0.0, -1, -1.0, "foo"])

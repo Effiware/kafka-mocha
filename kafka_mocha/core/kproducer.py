@@ -6,13 +6,13 @@ from typing import Any, Literal, Optional
 
 import confluent_kafka
 
-from kafka_mocha.buffer_handler import buffer_handler
+from kafka_mocha.core.buffer_handler import buffer_handler
+from kafka_mocha.core.kafka_simulator import KafkaSimulator
+from kafka_mocha.core.ticking_thread import TickingThread
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
-from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.kmodels import KMessage
-from kafka_mocha.signals import KMarkers, KSignals, Tick
-from kafka_mocha.ticking_thread import TickingThread
+from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.models.signals import KMarkers, KSignals, Tick
 from kafka_mocha.utils import validate_config
 
 MAX_BUFFER_LEN = 2147483647

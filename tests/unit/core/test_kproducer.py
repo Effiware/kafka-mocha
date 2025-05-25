@@ -1,8 +1,8 @@
 import logging
 from inspect import GEN_SUSPENDED, getgeneratorstate
 
-from kafka_mocha.kmodels import KMessage
-from kafka_mocha.kproducer import KProducer
+from kafka_mocha.core.kproducer import KProducer
+from kafka_mocha.models.kmodels import KMessage
 
 
 def test_kproducers_buffer_is_primed(kproducer) -> None:

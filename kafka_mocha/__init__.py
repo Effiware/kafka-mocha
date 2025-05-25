@@ -4,6 +4,7 @@
 # Components of modules of different licenses are fully separated and do not include code from other modules. This is to
 # ensure that the licenses of the original code are preserved.
 
-from kafka_mocha.kproducer import KProducer as ProducerMock
+from kafka_mocha.core.kconsumer import KConsumer as ConsumerMock
+from kafka_mocha.core.kproducer import KProducer as ProducerMock
 from kafka_mocha.utils import validate_config
 from kafka_mocha.wrappers import mock_consumer, mock_producer

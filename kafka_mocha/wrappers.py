@@ -2,7 +2,8 @@ from functools import partial, wraps
 from typing import Any, Literal, Optional
 from unittest.mock import patch
 
-from kafka_mocha.kproducer import KProducer
+from kafka_mocha.core.kconsumer import KConsumer
+from kafka_mocha.core.kproducer import KProducer
 
 
 class mock_producer:
@@ -46,7 +47,11 @@ class mock_consumer:
     """
 
     def __init__(self, loglevel: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = None):
-        raise NotImplementedError("Not implemented yet")
+        self._patcher = (
+            patch("confluent_kafka.Consumer", new=partial(KConsumer, loglevel=loglevel))
+            if loglevel
+            else patch("confluent_kafka.Consumer", new=KConsumer)
+        )
 
     def __call__(self, func):
         raise NotImplementedError("Not implemented yet")

@@ -6,10 +6,10 @@ from typing import Any, Callable, Literal, Optional
 import confluent_kafka
 from confluent_kafka import TopicPartition
 
+from kafka_mocha.core.kafka_simulator import KafkaSimulator
 from kafka_mocha.exceptions import KConsumerMaxRetryException, KConsumerTimeoutException
-from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.kmodels import KMessage
+from kafka_mocha.models.kmodels import KMessage
 from kafka_mocha.utils import validate_config
 
 

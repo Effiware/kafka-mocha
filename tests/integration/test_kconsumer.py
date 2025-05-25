@@ -6,9 +6,9 @@ from unittest.mock import patch
 import pytest
 from confluent_kafka import TopicPartition
 
+from kafka_mocha.core.kconsumer import KConsumer
+from kafka_mocha.core.kproducer import KProducer
 from kafka_mocha.exceptions import KConsumerMaxRetryException
-from kafka_mocha.kconsumer import KConsumer
-from kafka_mocha.kproducer import KProducer
 
 OFFSET_ZERO = 1000
 
@@ -292,7 +292,7 @@ class TestKConsumerAbstractionLayers:
         )
 
         # Mock the generator state to always be busy
-        with patch("kafka_mocha.kconsumer.getgeneratorstate", return_value="GEN_RUNNING"):
+        with patch("kafka_mocha.core.kconsumer.getgeneratorstate", return_value="GEN_RUNNING"):
             request = (id(consumer), [TopicPartition("test-topic", 0, 0)], 1)
 
             # Should raise exception after max retries
@@ -344,7 +344,7 @@ class TestKConsumerAbstractionLayers:
         consumer.assign([TopicPartition("test-topic", 0, 0)])
 
         # Create mock messages
-        from kafka_mocha.kmodels import KMessage
+        from kafka_mocha.models.kmodels import KMessage
 
         messages = [KMessage("test-topic", 0, b"key1", b"value1"), KMessage("test-topic", 0, b"key2", b"value2")]
         messages[0].set_offset(10)

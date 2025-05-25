@@ -6,11 +6,11 @@ from typing import Callable, Literal, Optional
 
 import confluent_kafka
 
+from kafka_mocha.core.kafka_simulator import KafkaSimulator
 from kafka_mocha.exceptions import KProducerProcessingException
-from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.kmodels import KMessage
-from kafka_mocha.signals import KSignals, Tick
+from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.models.signals import KSignals, Tick
 
 DEFAULT_BUFFER_SIZE = 1048576  # 1MB
 DEFAULT_BUFFER_TIMEOUT = 5  # 5ms
