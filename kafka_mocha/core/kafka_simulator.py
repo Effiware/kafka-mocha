@@ -26,6 +26,7 @@ try:
 except KeyError as err:
     raise KafkaSimulatorBootstrapException(f"Missing Kafka Mocha required variable: {err}") from None
 
+SYSTEM_TOPICS = ["_schemas", "__consumer_offsets"]
 logger = get_custom_logger()
 
 
@@ -62,11 +63,13 @@ class KafkaSimulator:
         return cls._instance
 
     def __init__(self):
-        self.one_ack_delay = ONE_ACK_DELAY
-        self.all_ack_delay = ALL_ACK_DELAY
+        if self._is_running:
+            return
+        # self.one_ack_delay = ONE_ACK_DELAY
+        # self.all_ack_delay = ALL_ACK_DELAY
         self.topics: list[KTopic] = [KTopic.from_env(topic) for topic in TOPICS]
-        self.topics.append(KTopic("_schemas"))  # Built-in `_schemas` topic
-        self.topics.append(KTopic("__consumer_offsets"))  # Built-in `__consumer_offsets` topic
+        for sys_topic in SYSTEM_TOPICS:
+            self.topics.append(KTopic(sys_topic))
         self._registered_transact_ids: dict[str, list[ProducerAndState]] = defaultdict(list)  # Epoch is list length
 
         # Consumer group management
@@ -80,6 +83,7 @@ class KafkaSimulator:
         self.consumers_handler = self.handle_consumers()
         self.consumers_handler.send(KSignals.INIT.value)
 
+        self._is_running = True
         logger.info("Kafka Simulator initialized, id: %s", id(self))
         logger.debug("Registered topics: %s", self.topics)
 
@@ -310,8 +314,24 @@ class KafkaSimulator:
         logger.info("Handle consumers has been primed")
         while True:
             request = yield KSignals.SUCCESS
+            if isinstance(request, tuple) and len(request) == 3:
+                # Handle a poll request: (consumer_id, topic_partitions, max_records)
+                consumer_id, topic_partitions, max_records = request
 
-            if isinstance(request, TopicPartition):
+                # Get all messages for the requested partitions
+                messages = []
+                for tp in topic_partitions:
+                    topic = next((t for t in self.topics if t.name == tp.topic), None)
+                    if topic is None or tp.partition >= len(topic.partitions):
+                        continue
+
+                    partition = topic.partitions[tp.partition]
+                    messages += partition.get_by_offset(tp.offset, max_records)
+
+                logger.debug("Consumer %d polling, found %d messages", consumer_id, len(messages))
+                yield messages
+
+            elif isinstance(request, TopicPartition):
                 # Handle a seek request
                 topic_name = request.topic
                 partition_id = request.partition
@@ -324,39 +344,11 @@ class KafkaSimulator:
                     continue
 
                 # Process the request
-                logger.debug("Consumer seeking to offset %d for %s[%d]", offset, topic_name, partition_id)
+                logger.warning("Consumer seeking to offset %d for %s[%d]", offset, topic_name, partition_id)
                 # Actual seek logic is handled in the consumer since we just return messages
 
-            elif isinstance(request, tuple) and len(request) == 3:
-                # Handle a poll request: (consumer_id, topic_partitions, max_records)
-                consumer_id, topic_partitions, max_records = request
-
-                # Get all messages for the requested partitions
-                messages = []
-                for tp in topic_partitions:
-                    topic = next((t for t in self.topics if t.name == tp.topic), None)
-                    if topic is None or tp.partition >= len(topic.partitions):
-                        continue
-
-                    partition = topic.partitions[tp.partition]
-                    start_idx = 0
-
-                    # If an offset is specified, find the starting point
-                    if tp.offset > -1:
-                        start_idx = partition.seek(tp.offset)
-
-                    # Get messages from the partition
-                    for i in range(start_idx, len(partition)):
-                        if len(messages) >= max_records:
-                            break
-                        messages.append(partition[i])
-
-                logger.debug("Consumer %d polling, found %d messages", consumer_id, len(messages))
-                yield messages
-
             else:
-                logger.warning("Unknown request type in consumer handler: %s", type(request))
-                yield []
+                raise KafkaSimulatorProcessingException(f"Unknown request type in consumer handler: {type(request)}")
 
     def register_consumer(self, consumer_id: int, group_id: str, topics: list[str]) -> None:
         """
@@ -449,40 +441,6 @@ class KafkaSimulator:
         # For manual partition assignment, we don't involve consumer groups
         logger.debug("Manually assigning partitions to consumer %d: %s", consumer_id, partitions)
 
-    def commit_offsets(self, consumer_id: int, offsets: list[TopicPartition]) -> None:
-        """Commit offsets for a consumer."""
-        if consumer_id in self._consumer_2_group:
-            group_id = self._consumer_2_group[consumer_id]
-            logger.debug("Committing offsets for consumer %d in group %s: %s", consumer_id, group_id, offsets)
-
-            if group_id in self._consumer_groups:
-                self._consumer_groups[group_id].update_offsets(offsets)
-
-                # Store the offsets in the __consumer_offsets topic
-                self._store_consumer_offsets(group_id, offsets)
-
-    def _store_consumer_offsets(self, group_id: str, offsets: list[TopicPartition]) -> None:
-        """Store consumer group offsets in the __consumer_offsets topic."""
-        offset_topic = next((t for t in self.topics if t.name == "__consumer_offsets"), None)
-        if offset_topic is None:
-            logger.error("__consumer_offsets topic not found, this should not happen")
-            return
-
-        # In a real Kafka cluster, offsets would be stored with specific keys and formats
-        # For our simulator, we'll store them as simple messages
-        for tp in offsets:
-            key = f"{group_id}:{tp.topic}:{tp.partition}"
-            value = str(tp.offset).encode()
-            partition = abs(hash(key)) % len(offset_topic.partitions)
-
-            message = KMessage("__consumer_offsets", partition, key.encode(), value)
-
-            # Use the producers handler to store the message
-            if getgeneratorstate(self.producers_handler) == GEN_SUSPENDED:
-                self.producers_handler.send(message)
-            else:
-                raise KafkaSimulatorProcessingException("Producers handler is not in a suspended state")
-
     def get_committed_offsets(self, consumer_id: int, partitions: list[TopicPartition]) -> list[TopicPartition]:
         """Get committed offsets for a consumer."""
         result = []
@@ -513,19 +471,6 @@ class KafkaSimulator:
             if group_id in self._consumer_groups:
                 return self._consumer_groups[group_id].get_member_assignment(consumer_id)
         return []
-
-    # def run(self):
-    #     # handle producers
-    #     while True:
-    #         try:
-    #             self.handle_consumers()
-    #         except StopIteration:
-    #             print("[KAFKA] Consumers handled")
-    #
-    #         try:
-    #             self.handle_producers()
-    #         except StopIteration:
-    #             print("[KAFKA] Producers handled")
 
     def render_records(self, output: dict[str, Any]):
         """Renders Kafka records in the specified format."""

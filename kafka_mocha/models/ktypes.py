@@ -1,5 +1,5 @@
-from typing import Literal, TypeVar
+from typing import TypeVar, Literal
 
-LogLevelType = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-OutputFormat = Literal["html", "csv"]
-InputFormat = dict[Literal["source", "topic", "serialize", "subject_name_strategy"], str | bool]
+LogLevelType = TypeVar("LogLevelType", bound=Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+OutputFormat = TypeVar("OutputFormat", bound=Literal["html", "csv"])
+InputFormat = TypeVar("InputFormat", bound=dict[Literal["source", "topic", "serialize"], str | bool])

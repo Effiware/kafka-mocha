@@ -23,7 +23,7 @@ def test_kproducer_returns_produced_messages_no__happy(kproducer) -> None:
 def test_kafka_simulator_received_messages__short_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a short-running task."""
 
-    topic_name = "test-topic-short"
+    topic_name = "topic-short"
     no_msg_to_produce = 10000
     for idx, _ in enumerate(range(no_msg_to_produce)):
         kproducer.produce(topic_name, "value".encode(), f"key-{idx}".encode(), on_delivery=lambda *_: randint(1, 100))
@@ -42,7 +42,7 @@ def test_kafka_simulator_received_messages__short_running_task(kafka, kproducer)
 @pytest.mark.slow
 def test_kafka_simulator_received_messages__medium_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a medium-running task."""
-    topic_name = "test-topic-medium"
+    topic_name = "topic-medium"
     no_msg_to_produce = 1000
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.01)
@@ -62,7 +62,7 @@ def test_kafka_simulator_received_messages__medium_running_task(kafka, kproducer
 @pytest.mark.slow
 def test_kafka_simulator_received_messages__long_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a long-running task."""
-    topic_name = "test-topic-long"
+    topic_name = "topic-long"
     no_msg_to_produce = 100
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.3)
