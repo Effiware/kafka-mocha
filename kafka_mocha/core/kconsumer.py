@@ -1,15 +1,20 @@
+import json
 import signal
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Callable, Optional
 
 import confluent_kafka
 from confluent_kafka import TopicPartition
 
+from kafka_mocha.core.buffer_handler import buffer_handler
 from kafka_mocha.core.kafka_simulator import KafkaSimulator
-from kafka_mocha.exceptions import KConsumerMaxRetryException, KConsumerTimeoutException
+from kafka_mocha.core.ticking_thread import TickingThread
+from kafka_mocha.exceptions import KConsumerMaxRetryException, KConsumerTimeoutException, KafkaClientBootstrapException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.models.ktypes import LogLevelType, InputFormat
+from kafka_mocha.models.signals import KSignals, Tick
 from kafka_mocha.utils import validate_config
 
 
@@ -23,12 +28,13 @@ class KConsumer:
     def __init__(
         self,
         config: dict[str, Any],
-        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
+        inputs: Optional[list[InputFormat]] = None,
+        loglevel: LogLevelType = "WARNING",
     ):
         validate_config("consumer", config)
         self.config = config
+        self._group_id = config["group.id"]
         self.logger = get_custom_logger(loglevel)
-        self._group_id = config.get("group.id")
 
         # Consumer state
         self._subscription: list[str] = []
@@ -51,10 +57,38 @@ class KConsumer:
         self._max_retry_count = config.get("retries", 6)
         self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
-        # Connect to Kafka simulator
+        # Connect to Kafka simulator, buffer handler and load inputs if provided
         self._kafka_simulator = KafkaSimulator()
+        self._buffer = []
+        self._buffer_handler = buffer_handler(f"KConsumer({id(self)})", self._buffer,10000, self._auto_commit_interval_ms if self._enable_auto_commit else 10000)
+        self._buffer_handler.send(KSignals.INIT.value)
+        if inputs:
+            self._upload_inputs(inputs)
+        if self._enable_auto_commit:
+            self._ticking_thread = TickingThread(f"KConsumer({id(self)})", self._buffer_handler, self._auto_commit_interval_ms // 2)
+            self._ticking_thread.daemon = True  # TODO 34: Workaround for #34 bug/34-tickingthread-never-joins
+            self._ticking_thread.start()
 
         self.logger.info("KConsumer initialized, id: %s, group: %s", id(self), self._group_id)
+
+    def _upload_inputs(self, inputs: list[InputFormat]) -> None:
+        """Upload input data to the Kafka simulator."""
+        for _input in inputs:
+            if _input.get("source") is None or _input.get("topic") is None:
+                raise KafkaClientBootstrapException("Input format must contain 'source' and 'topic' keys")
+
+            with open(_input["source"], "r") as file:
+                messages: list[dict] = json.loads(file.read())
+                for message in messages:
+                    key = message.get("key", None)
+                    value = message.get("value", None)
+                    headers = message.get("headers", None)
+
+                    # TODO: handle serialization if needed
+                    value = json.dumps(value)
+                    _ = self._buffer_handler.send(KMessage(_input.get("topic"), -1, key, value, headers))
+
+                self._tick_buffer()
 
     def _update_assignment(self, partitions: list[TopicPartition]) -> None:
         """Helper method to update internal assignment state."""
@@ -183,14 +217,16 @@ class KConsumer:
         asynchronous: bool = True,
     ) -> Optional[list[TopicPartition]]:
         """
-        Commit a message or a list of offsets.
+        Commit a message or a list of offsets. This behaviour actually differs from the real Kafka client, as in reality
+        Consumer does not write to `__consumer_offsets` topic directly, but rather uses the group coordinator to
+        commit offsets.
 
         :param message: Commit the message's offset+1.
         :param offsets: list of topic+partitions+offsets to commit.
         :param asynchronous: If true, asynchronously commit, returning None immediately.
         :returns: None if asynchronous, otherwise the committed offsets.
         """
-        offsets_to_commit = []
+        offsets_to_commit: list[TopicPartition] = []
 
         # If message is provided, create an offset for it
         if message is not None:
@@ -204,13 +240,10 @@ class KConsumer:
                 for partition, offset in partitions.items():
                     offsets_to_commit.append(TopicPartition(topic, partition, offset))
 
-        # Commit the offsets
         if offsets_to_commit:
-            self._kafka_simulator.commit_offsets(id(self), offsets_to_commit)
-            self.logger.debug("Committed offsets: %s", offsets_to_commit)
-
-            # Return the committed offsets if not asynchronous
+            self._commit_offsets_async(offsets_to_commit)
             if not asynchronous:
+                self._tick_buffer()
                 return offsets_to_commit
 
         return None
@@ -245,11 +278,6 @@ class KConsumer:
 
     def _maybe_auto_commit(self):
         """Auto-commit offsets if enabled and it's time to commit."""
-        # In a real implementation, this would check the elapsed time since
-        # the last auto-commit and only commit if auto_commit_interval_ms has passed
-        # current_time = time() * 1000  # Convert to ms
-
-        # For simplicity, we'll just commit the current positions
         if self._positions:
             offsets_to_commit = []
             for topic, partitions in self._positions.items():
@@ -257,9 +285,9 @@ class KConsumer:
                     offsets_to_commit.append(TopicPartition(topic, partition, offset))
 
             if offsets_to_commit:
-                self._kafka_simulator.commit_offsets(id(self), offsets_to_commit)
+                self._commit_offsets_async(offsets_to_commit)
 
-    def _fetch_with_retry(self, request: tuple) -> list[KMessage]:
+    def _fetch_with_retry(self, request: tuple[int, list[TopicPartition], int]) -> list[KMessage]:
         """
         Fetch messages from simulator with retry mechanism.
 
@@ -281,10 +309,10 @@ class KConsumer:
                     return messages
                 else:
                     # It's likely a signal, return empty list
-                    self.logger.debug("KConsumer(%d): received signal %s, returning empty list", id(self), result)
+                    self.logger.warning("KConsumer(%d): received signal %s, returning empty list", id(self), result)
                     return []
             else:
-                self.logger.debug("KConsumer(%d): consumer handler is busy", id(self))
+                self.logger.info("KConsumer(%d): consumer handler is busy", id(self))
                 count += 1
                 sleep(count**2 * self._retry_backoff)
         else:
@@ -791,9 +819,48 @@ class KConsumer:
 
         return low_offset, high_offset
 
+    def _send_with_retry(self, message: KMessage) -> None:
+        """Send message to buffer handler with retry mechanism."""
+        count = 0
+        while count < self._max_retry_count:
+            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
+                ack = self._buffer_handler.send(message)
+                self.logger.debug("KConsumer(%d): received ack: %s", id(self), ack)
+                break
+            else:
+                self.logger.debug("KConsumer(%d): buffer is busy", id(self))
+                count += 1
+                sleep(count**2 * self._retry_backoff)
+        else:
+            raise KConsumerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
+
+    def _tick_buffer(self):
+        """
+        Sends `DONE` signal to message buffer handler in order to force sending buffered messages to Kafka Simulator.
+        """
+        try_count = 0
+        while try_count < self._max_retry_count:
+            if getgeneratorstate(self._buffer_handler) == GEN_SUSPENDED:
+                self._buffer_handler.send(Tick.DONE)
+                break
+            else:
+                try_count += 1
+                sleep(try_count**2 * self._retry_backoff)
+        else:
+            raise KConsumerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
+
+    def _commit_offsets_async(self, offsets: list[TopicPartition]) -> None:
+        """Commit offsets to the __consumer_offsets topic."""
+        for offset in offsets:
+            key = f"{self._group_id}:{offset.topic}:{offset.partition}".encode()
+            value = str(offset.offset).encode()
+            self._send_with_retry(KMessage("__consumer_offsets", -1, key, value))
+
+        self.logger.debug("Committed offsets: %s", offsets)
+
     def __del__(self):
         if hasattr(self, "config"):  # if __init__ was called without exceptions
             try:
                 self.close()
             except Exception as e:
-                self.logger.warning("Error during KConsumer destruction: %s", e)
+                self.logger.error("Error during KConsumer destruction: %s", e)

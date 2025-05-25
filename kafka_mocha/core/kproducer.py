@@ -2,7 +2,7 @@ import signal
 from functools import reduce
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 import confluent_kafka
 
@@ -12,6 +12,7 @@ from kafka_mocha.core.ticking_thread import TickingThread
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.models.ktypes import LogLevelType
 from kafka_mocha.models.signals import KMarkers, KSignals, Tick
 from kafka_mocha.utils import validate_config
 
@@ -26,12 +27,7 @@ class KProducer:
     emulator for Kafka Producer.
     """
 
-    def __init__(
-        self,
-        config: dict[str, Any],
-        output: Optional[dict[str, Any]] = None,
-        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
-    ):
+    def __init__(self, config: dict[str, Any], output: Optional[dict[str, Any]] = None, loglevel: LogLevelType = "WARNING"):
         validate_config("producer", config)
         self.config = config
         self.output = output
