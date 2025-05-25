@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from kafka_mocha.core.kconsumer import KConsumer
 from kafka_mocha.core.kproducer import KProducer
-from kafka_mocha.models.ktypes import LogLevelType, InputFormat
+from kafka_mocha.models.ktypes import InputFormat, LogLevelType
 
 
 class mock_producer:

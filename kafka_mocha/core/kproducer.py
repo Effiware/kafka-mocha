@@ -27,7 +27,9 @@ class KProducer:
     emulator for Kafka Producer.
     """
 
-    def __init__(self, config: dict[str, Any], output: Optional[dict[str, Any]] = None, loglevel: LogLevelType = "WARNING"):
+    def __init__(
+        self, config: dict[str, Any], output: Optional[dict[str, Any]] = None, loglevel: LogLevelType = "WARNING"
+    ):
         validate_config("producer", config)
         self.config = config
         self.output = output

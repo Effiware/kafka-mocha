@@ -243,7 +243,7 @@ class KPartition:
         self._heap: list[KMessage] = []
 
     def append(self, message: KMessage) -> None:
-        """ Append a message to the partition."""
+        """Append a message to the partition."""
         self._heap.append(message)
 
     def get_by_offset(self, offset: int = 0, batch_size: int = 1) -> list[KMessage]:
@@ -253,7 +253,7 @@ class KPartition:
             if msq.offset() is not None and msq.offset() >= offset:
                 found_idx = idx
                 break
-        return self._heap[found_idx:found_idx+batch_size]
+        return self._heap[found_idx : found_idx + batch_size]
 
     def get_by_timestamp(self, timestamp: int, batch_size: int = 1) -> list[KMessage]:
         """Get messages starting from a specific timestamp."""

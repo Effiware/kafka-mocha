@@ -10,10 +10,10 @@ from confluent_kafka import TopicPartition
 from kafka_mocha.core.buffer_handler import buffer_handler
 from kafka_mocha.core.kafka_simulator import KafkaSimulator
 from kafka_mocha.core.ticking_thread import TickingThread
-from kafka_mocha.exceptions import KConsumerMaxRetryException, KConsumerTimeoutException, KafkaClientBootstrapException
+from kafka_mocha.exceptions import KafkaClientBootstrapException, KConsumerMaxRetryException, KConsumerTimeoutException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models.kmodels import KMessage
-from kafka_mocha.models.ktypes import LogLevelType, InputFormat
+from kafka_mocha.models.ktypes import InputFormat, LogLevelType
 from kafka_mocha.models.signals import KSignals, Tick
 from kafka_mocha.utils import validate_config
 
@@ -60,12 +60,19 @@ class KConsumer:
         # Connect to Kafka simulator, buffer handler and load inputs if provided
         self._kafka_simulator = KafkaSimulator()
         self._buffer = []
-        self._buffer_handler = buffer_handler(f"KConsumer({id(self)})", self._buffer,10000, self._auto_commit_interval_ms if self._enable_auto_commit else 10000)
+        self._buffer_handler = buffer_handler(
+            f"KConsumer({id(self)})",
+            self._buffer,
+            10000,
+            self._auto_commit_interval_ms if self._enable_auto_commit else 10000,
+        )
         self._buffer_handler.send(KSignals.INIT.value)
         if inputs:
             self._upload_inputs(inputs)
         if self._enable_auto_commit:
-            self._ticking_thread = TickingThread(f"KConsumer({id(self)})", self._buffer_handler, self._auto_commit_interval_ms // 2)
+            self._ticking_thread = TickingThread(
+                f"KConsumer({id(self)})", self._buffer_handler, self._auto_commit_interval_ms // 2
+            )
             self._ticking_thread.daemon = True  # TODO 34: Workaround for #34 bug/34-tickingthread-never-joins
             self._ticking_thread.start()
 
