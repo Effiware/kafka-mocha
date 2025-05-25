@@ -346,7 +346,6 @@ class TestKConsumerAbstractionLayers:
 
         consumer.close()
 
-
     def test_auto_commit_integration(self, fresh_kafka):
         """Test auto-commit functionality with real message consumption."""
         # Create producer and consumer with auto-commit enabled
