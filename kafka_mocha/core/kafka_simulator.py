@@ -9,15 +9,11 @@ import confluent_kafka
 from confluent_kafka import TopicPartition
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
-from kafka_mocha.exceptions import (
-    KafkaSimulatorBootstrapException,
-    KafkaSimulatorProcessingException,
-    KConsumerGroupException,
-)
+from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaSimulatorProcessingException
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.kmodels import KConsumerGroup, KMessage, KTopic
+from kafka_mocha.models.kmodels import KConsumerGroup, KMessage, KTopic
+from kafka_mocha.models.signals import KSignals
 from kafka_mocha.renderers import render
-from kafka_mocha.signals import KSignals
 
 try:
     ONE_ACK_DELAY = os.environ.get("KAFKA_MOCHA_KSIM_ONE_ACK_DELAY", 1)

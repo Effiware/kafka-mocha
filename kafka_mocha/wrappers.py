@@ -1,10 +1,9 @@
 from functools import partial, wraps
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from unittest.mock import patch
 
 from kafka_mocha.core.kconsumer import KConsumer
 from kafka_mocha.core.kproducer import KProducer
-from kafka_mocha.models.ktypes import InputFormat, LogLevelType
 
 
 class mock_producer:
@@ -13,7 +12,11 @@ class mock_producer:
     TODO: More detailed description will be added in the future.
     """
 
-    def __init__(self, output: Optional[dict[str, Any]] = None, loglevel: Optional[LogLevelType] = None):
+    def __init__(
+        self,
+        output: Optional[dict[str, Any]] = None,
+        loglevel: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = None,
+    ):
         self._patcher = (
             patch("confluent_kafka.Producer", new=partial(KProducer, output=output, loglevel=loglevel))
             if loglevel
@@ -43,25 +46,18 @@ class mock_consumer:
     TODO: More detailed description will be added in the future.
     """
 
-    def __init__(self, inputs: Optional[list[InputFormat]] = None, loglevel: Optional[LogLevelType] = None):
+    def __init__(self, loglevel: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = None):
         self._patcher = (
-            patch("confluent_kafka.Consumer", new=partial(KConsumer, inputs=inputs, loglevel=loglevel))
+            patch("confluent_kafka.Consumer", new=partial(KConsumer, loglevel=loglevel))
             if loglevel
-            else patch("confluent_kafka.Consumer", new=partial(KConsumer, inputs=inputs))
+            else patch("confluent_kafka.Consumer", new=KConsumer)
         )
 
     def __call__(self, func):
-
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            with self._patcher:
-                return func(*args, **kwargs)
-
-        return wrapper
+        raise NotImplementedError("Not implemented yet")
 
     def __enter__(self):
-        self._patcher.start()
-        return self
+        raise NotImplementedError("Not implemented yet")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._patcher.stop()
+        raise NotImplementedError("Not implemented yet")
