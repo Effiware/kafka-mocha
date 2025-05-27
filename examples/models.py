@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from uuid import UUID, uuid4
@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 def dict_factory(data) -> dict:
     """Converts dataclass to dictionary with custom conversion for UUID, Enum and datetime."""
+
     def convert(obj):
         if isinstance(obj, Enum):
             return obj.value
@@ -14,6 +15,7 @@ def dict_factory(data) -> dict:
         elif isinstance(obj, datetime):
             return int(obj.timestamp() * 1000)
         return obj
+
     return {k: convert(v) for k, v in data}
 
 

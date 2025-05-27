@@ -1,0 +1,89 @@
+[
+  {
+    "key": {
+      "payload": {
+        "id": "52436bdf-9303-4335-939b-6f5889c14d02",
+        "type": "registration-service"
+      },
+      "subject": "user-registered-cons-avro-key",
+      "schemaType": "AVRO"
+    },
+    "value": {
+      "payload": {
+        "user_id": "52436bdf-9303-4335-939b-6f5889c14d02",
+        "user_name": "Jannet",
+        "user_last_name": "Jsonsky",
+        "is_new_user": true,
+        "subscription_type": "FREE",
+        "registration_timestamp": 1748343009310,
+        "score": 7.2,
+        "envelope": {
+          "envelope_id": "f2d195e1-9d11-4a58-b310-9e1869373367",
+          "event_timestamp": 1748343009310,
+          "app_name": "ExampleApp",
+          "app_version": "1.0.0"
+        }
+      },
+      "subject": "user-registered-cons-avro-value",
+      "schemaType": "AVRO"
+    }
+  },
+  {
+    "key": {
+      "payload": {
+        "id": "dd6b9cfd-135e-4b5b-a34c-a0ecd7a2b563",
+        "type": "registration-service"
+      },
+      "subject": "user-registered-cons-avro-key",
+      "schemaType": "AVRO"
+    },
+    "value": {
+      "payload": {
+        "user_id": "dd6b9cfd-135e-4b5b-a34c-a0ecd7a2b563",
+        "user_name": "Johnny",
+        "user_last_name": "Bravissmo",
+        "is_new_user": false,
+        "subscription_type": "LITE",
+        "registration_timestamp": 1748343049718,
+        "score": 42.5,
+        "envelope": {
+          "envelope_id": "d218b397-f200-445f-861e-0718b7f2df98",
+          "event_timestamp": 1748343049718,
+          "app_name": "ExampleApp",
+          "app_version": "1.0.0"
+        }
+      },
+      "subject": "user-registered-cons-avro-value",
+      "schemaType": "AVRO"
+    }
+  },
+  {
+    "key": {
+      "payload": {
+        "id": "e14365d3-fba9-4c73-88ae-7c53f7f07ea8",
+        "type": "registration-service"
+      },
+      "subject": "user-registered-cons-avro-key",
+      "schemaType": "AVRO"
+    },
+    "value": {
+      "payload": {
+        "user_id": "e14365d3-fba9-4c73-88ae-7c53f7f07ea8",
+        "user_name": "Andrea",
+        "user_last_name": "Testovska",
+        "is_new_user": false,
+        "subscription_type": "PRO",
+        "registration_timestamp": 1748343097016,
+        "score": 85.0,
+        "envelope": {
+          "envelope_id": "a1b2c3d4-e5f6-7a8b-9a0b-c1d2e3f4g5h6",
+          "event_timestamp": 1748343097016,
+          "app_name": "ExampleApp",
+          "app_version": "1.0.0"
+        }
+      },
+      "subject": "user-registered-cons-avro-value",
+      "schemaType": "AVRO"
+    }
+  }
+]

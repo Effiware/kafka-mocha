@@ -128,7 +128,6 @@ def stale_transaction_fencing():
                 else:
                     print(f"{self.name}: transaction committed")
 
-
     producing_thread_0 = ProducerThread(name="first_producer", run_id=0)
     producing_thread_1 = ProducerThread(name="second_producer", run_id=1)
 

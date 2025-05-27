@@ -7,9 +7,9 @@ from uuid import uuid4
 import confluent_kafka
 import confluent_kafka.schema_registry
 from confluent_kafka.schema_registry.avro import AvroSerializer
-from confluent_kafka.serialization import SerializationContext, MessageField, StringSerializer
+from confluent_kafka.serialization import MessageField, SerializationContext, StringSerializer
 
-from examples.models import UserRegistered, EventEnvelope, SubscriptionType
+from examples.models import EventEnvelope, SubscriptionType, UserRegistered
 from kafka_mocha import mock_producer
 from kafka_mocha.schema_registry import mock_schema_registry
 from kafka_mocha.schema_registry.mock_schema_registry_client import MockSchemaRegistryClient
