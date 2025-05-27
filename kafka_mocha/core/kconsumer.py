@@ -2,10 +2,12 @@ import json
 import signal
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Literal
 
 import confluent_kafka
-from confluent_kafka import TopicPartition
+from confluent_kafka.schema_registry.avro import AvroSerializer
+from confluent_kafka.schema_registry.json_schema import JSONSerializer
+from confluent_kafka.serialization import SerializationContext, MessageField, StringSerializer, IntegerSerializer
 
 from kafka_mocha.core.buffer_handler import buffer_handler
 from kafka_mocha.core.kafka_simulator import KafkaSimulator
@@ -15,6 +17,8 @@ from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models.kmodels import KMessage
 from kafka_mocha.models.ktypes import InputFormat, LogLevelType
 from kafka_mocha.models.signals import KSignals, Tick
+from kafka_mocha.schema_registry import MockSchemaRegistryClient
+from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.utils import validate_config
 
 
@@ -38,9 +42,9 @@ class KConsumer:
 
         # Consumer state
         self._subscription: list[str] = []
-        self._assignment: list[TopicPartition] = []
+        self._assignment: list[confluent_kafka.TopicPartition] = []
         self._member_id = f"mock-consumer-{id(self)}"
-        self._paused_partitions: list[TopicPartition] = []
+        self._paused_partitions: list[confluent_kafka.TopicPartition] = []
         self._positions: dict[str, dict[int, int]] = {}  # topic -> partition -> offset
 
         # Callbacks
@@ -57,6 +61,9 @@ class KConsumer:
         self._max_retry_count = config.get("retries", 6)
         self._retry_backoff = config.get("retry.backoff.ms", 10) / 1000  # in seconds
 
+        # Connect to Schema Registry if load of serialized inputs is requested
+        self._schema_registry = None
+
         # Connect to Kafka simulator, buffer handler and load inputs if provided
         self._kafka_simulator = KafkaSimulator()
         self._buffer = []
@@ -68,17 +75,17 @@ class KConsumer:
         )
         self._buffer_handler.send(KSignals.INIT.value)
         if inputs:
-            self._upload_inputs(inputs)
+            self._inputs_upload(inputs)
         if self._enable_auto_commit:
             self._ticking_thread = TickingThread(
                 f"KConsumer({id(self)})", self._buffer_handler, self._auto_commit_interval_ms // 2
             )
             self._ticking_thread.daemon = True  # TODO 34: Workaround for #34 bug/34-tickingthread-never-joins
             self._ticking_thread.start()
-
+        
         self.logger.info("KConsumer initialized, id: %s, group: %s", id(self), self._group_id)
 
-    def _upload_inputs(self, inputs: list[InputFormat]) -> None:
+    def _inputs_upload(self, inputs: list[InputFormat]) -> None:
         """Upload input data to the Kafka simulator."""
         for _input in inputs:
             if _input.get("source") is None or _input.get("topic") is None:
@@ -87,17 +94,81 @@ class KConsumer:
             with open(_input["source"], "r") as file:
                 messages: list[dict] = json.loads(file.read())
                 for message in messages:
-                    key = message.get("key", None)
-                    value = message.get("value", None)
+                    key_field = message.get("key", None)
+                    key = key_field["payload"] if key_field else None
+                    value_field = message.get("value", None)
+                    value = value_field["payload"] if value_field else None
                     headers = message.get("headers", None)
 
-                    # TODO: handle serialization if needed
-                    value = json.dumps(value)
-                    _ = self._buffer_handler.send(KMessage(_input.get("topic"), -1, key, value, headers))
+                    # if isinstance(key, dict):
+                    #     if _input.get("serialize", False) and key_field and key_field.get("subject"):
+                    #         key = self._input_serialize(key_field, "KEY", _input["topic"])
+                    #     else:
+                    #         key = json.dumps(key)
+                    # if isinstance(value, dict):
+                    #     if _input.get("serialize", False) and value_field and value_field.get("subject"):
+                    #         value = self._input_serialize(value_field, "VALUE", _input["topic"])
+                    #     else:
+                    #         value = json.dumps(value)
+                    if _input.get("serialize", False):
+                        if isinstance(key, dict):
+                            if key_field and key_field.get("subject"):
+                                key = self._input_serialize(key_field, "KEY", _input["topic"])
+                            else:
+                                key = StringSerializer()(json.dumps(key))
+                        elif isinstance(key, int):
+                            key = IntegerSerializer()(str(key))
+                        else:
+                            key = StringSerializer()(key)
+
+                        if isinstance(value, dict):
+                            if value_field and value_field.get("subject"):
+                                value = self._input_serialize(value_field, "VALUE", _input["topic"])
+                            else:
+                                value = StringSerializer()(json.dumps(value))
+                        elif isinstance(value, int):
+                            value = IntegerSerializer()(str(value))
+                        else:
+                            value = StringSerializer()(value)
+                    else:
+                        key = json.dumps(key) if isinstance(key, dict) else key
+                        value = json.dumps(value) if isinstance(value, dict) else value
+
+                    self._buffer_handler.send(KMessage(_input.get("topic"), -1, key, value, headers))
 
                 self._tick_buffer()
 
-    def _update_assignment(self, partitions: list[TopicPartition]) -> None:
+    def _input_serialize(self, field: dict[str, str], ftype: Literal["KEY", "VALUE"], topic: str) -> bytes:
+        """Serialize input data based on the input format. Get schema from the mock schema registry."""
+        if self._schema_registry is None:
+            self._schema_registry = MockSchemaRegistryClient({"url": "http://localhost:8081"})
+
+        try:
+            reg_schema = self._schema_registry.get_latest_version(field["subject"])
+        except SchemaRegistryError:
+            raise KafkaClientBootstrapException(
+                f"Schema not found for subject: {field['subject']}. Use MockSchemaRegistryClient to register schemas. "
+                f"Available subjects: {self._schema_registry.get_subjects()}"
+            )
+
+        if field["schemaType"] == "JSON":
+            json_serializer = JSONSerializer(
+                schema_registry_client=self._schema_registry,
+                schema_str=reg_schema.schema,
+                conf={"auto.register.schemas": False, "use.latest.version": True},
+            )
+            return json_serializer(field["payload"], SerializationContext(topic, MessageField[ftype]))
+        elif field["schemaType"] == "AVRO":
+            avro_serializer = AvroSerializer(
+                self._schema_registry,
+                reg_schema.schema,
+                conf={"auto.register.schemas": False, "use.latest.version": True},
+            )
+            return avro_serializer(field["payload"], SerializationContext(topic, MessageField[ftype]))
+        else:
+            raise KafkaClientBootstrapException(f"Unsupported schema type: {field['schemaType']}")
+
+    def _update_assignment(self, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """Helper method to update internal assignment state."""
         # Store the assignment
         self._assignment = partitions.copy()
@@ -136,9 +207,9 @@ class KConsumer:
         else:  # Default to latest
             return high_watermark
 
-    def assign(self, partitions: list[TopicPartition]) -> None:
+    def assign(self, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """
-        Set the consumer partition assignment to the provided list of TopicPartition.
+        Set the consumer partition assignment to the provided list of confluent_kafka.TopicPartition.
 
         :param partitions: list of topic+partitions and optionally initial offsets to start consuming from.
         :raises: KafkaException
@@ -155,12 +226,12 @@ class KConsumer:
 
         self.logger.debug("Manually assigned partitions: %s", self._assignment)
 
-    def assignment(self) -> list[TopicPartition]:
+    def assignment(self) -> list[confluent_kafka.TopicPartition]:
         """
         Returns the current partition assignment.
 
         :returns: list of assigned topic+partitions.
-        :rtype: list(TopicPartition)
+        :rtype: list(confluent_kafka.TopicPartition)
         """
         return self._assignment.copy()
 
@@ -220,9 +291,9 @@ class KConsumer:
     def commit(
         self,
         message: Optional[KMessage] = None,
-        offsets: Optional[list[TopicPartition]] = None,
+        offsets: Optional[list[confluent_kafka.TopicPartition]] = None,
         asynchronous: bool = True,
-    ) -> Optional[list[TopicPartition]]:
+    ) -> Optional[list[confluent_kafka.TopicPartition]]:
         """
         Commit a message or a list of offsets. This behaviour actually differs from the real Kafka client, as in reality
         Consumer does not write to `__consumer_offsets` topic directly, but rather uses the group coordinator to
@@ -233,11 +304,11 @@ class KConsumer:
         :param asynchronous: If true, asynchronously commit, returning None immediately.
         :returns: None if asynchronous, otherwise the committed offsets.
         """
-        offsets_to_commit: list[TopicPartition] = []
+        offsets_to_commit: list[confluent_kafka.TopicPartition] = []
 
         # If message is provided, create an offset for it
         if message is not None:
-            offsets_to_commit.append(TopicPartition(message.topic(), message.partition(), message.offset() + 1))
+            offsets_to_commit.append(confluent_kafka.TopicPartition(message.topic(), message.partition(), message.offset() + 1))
         # If offsets are provided, use them
         elif offsets is not None:
             offsets_to_commit = offsets
@@ -245,7 +316,7 @@ class KConsumer:
         else:
             for topic, partitions in self._positions.items():
                 for partition, offset in partitions.items():
-                    offsets_to_commit.append(TopicPartition(topic, partition, offset))
+                    offsets_to_commit.append(confluent_kafka.TopicPartition(topic, partition, offset))
 
         if offsets_to_commit:
             self._commit_offsets_async(offsets_to_commit)
@@ -289,12 +360,12 @@ class KConsumer:
             offsets_to_commit = []
             for topic, partitions in self._positions.items():
                 for partition, offset in partitions.items():
-                    offsets_to_commit.append(TopicPartition(topic, partition, offset))
+                    offsets_to_commit.append(confluent_kafka.TopicPartition(topic, partition, offset))
 
             if offsets_to_commit:
                 self._commit_offsets_async(offsets_to_commit)
 
-    def _fetch_with_retry(self, request: tuple[int, list[TopicPartition], int]) -> list[KMessage]:
+    def _fetch_with_retry(self, request: tuple[int, list[confluent_kafka.TopicPartition], int]) -> list[KMessage]:
         """
         Fetch messages from simulator with retry mechanism.
 
@@ -316,7 +387,7 @@ class KConsumer:
                     return messages
                 else:
                     # It's likely a signal, return empty list
-                    self.logger.warning("KConsumer(%d): received signal %s, returning empty list", id(self), result)
+                    self.logger.debug("KConsumer(%d): received signal %s, returning empty list", id(self), result)
                     return []
             else:
                 self.logger.info("KConsumer(%d): consumer handler is busy", id(self))
@@ -338,7 +409,7 @@ class KConsumer:
             current_offset = -1
             if tp.topic in self._positions and tp.partition in self._positions[tp.topic]:
                 current_offset = self._positions[tp.topic][tp.partition]
-            topic_partitions.append(TopicPartition(tp.topic, tp.partition, current_offset))
+            topic_partitions.append(confluent_kafka.TopicPartition(tp.topic, tp.partition, current_offset))
 
         # Create the request tuple for the simulator
         request = (id(self), topic_partitions, num_messages)
@@ -368,7 +439,7 @@ class KConsumer:
         if self._enable_auto_commit:
             self._maybe_auto_commit()
 
-    def _on_partition_assign(self, assignment: list[TopicPartition]) -> None:
+    def _on_partition_assign(self, assignment: list[confluent_kafka.TopicPartition]) -> None:
         """Handle assignment of new partitions."""
         # Update our internal state with the new assignment
         self._update_assignment(assignment)
@@ -382,7 +453,7 @@ class KConsumer:
 
         self.logger.debug("Assigned partitions: %s", assignment)
 
-    def _on_partition_revoke(self, revoked: list[TopicPartition]) -> None:
+    def _on_partition_revoke(self, revoked: list[confluent_kafka.TopicPartition]) -> None:
         """Handle revocation of partitions."""
         # If callback is set, call on_revoke
         if self._on_revoke:
@@ -393,7 +464,7 @@ class KConsumer:
 
         self.logger.debug("Revoked partitions: %s", revoked)
 
-    def _on_partition_lost(self, lost: list[TopicPartition]) -> None:
+    def _on_partition_lost(self, lost: list[confluent_kafka.TopicPartition]) -> None:
         """Handle lost partitions."""
         # If lost callback is set, call it
         if self._on_lost:
@@ -509,9 +580,9 @@ class KConsumer:
 
         self.logger.debug("Unsubscribed from all topics")
 
-    def incremental_assign(self, partitions: list[TopicPartition]) -> None:
+    def incremental_assign(self, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """
-        Incrementally add the provided list of TopicPartition to the current partition assignment.
+        Incrementally add the provided list of confluent_kafka.TopicPartition to the current partition assignment.
 
         :param partitions: list of topic+partitions and optionally initial offsets to start consuming from.
         :raises: KafkaException
@@ -562,9 +633,9 @@ class KConsumer:
 
         self.logger.debug("Incrementally assigned partitions: %s", partitions)
 
-    def incremental_unassign(self, partitions: list[TopicPartition]) -> None:
+    def incremental_unassign(self, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """
-        Incrementally remove the provided list of TopicPartition from the current partition assignment.
+        Incrementally remove the provided list of confluent_kafka.TopicPartition from the current partition assignment.
 
         :param partitions: list of topic+partitions to remove from the current assignment.
         :raises: KafkaException
@@ -677,7 +748,7 @@ class KConsumer:
                 sleep(remaining_time)
         return result
 
-    def committed(self, partitions: list[TopicPartition]) -> list[TopicPartition]:
+    def committed(self, partitions: list[confluent_kafka.TopicPartition]) -> list[confluent_kafka.TopicPartition]:
         """
         Retrieve committed offsets for the specified partitions.
 
@@ -686,7 +757,7 @@ class KConsumer:
         """
         return self._kafka_simulator.get_committed_offsets(id(self), partitions)
 
-    def position(self, partitions: list[TopicPartition]) -> list[TopicPartition]:
+    def position(self, partitions: list[confluent_kafka.TopicPartition]) -> list[confluent_kafka.TopicPartition]:
         """
         Retrieve current positions (offsets) for the specified partitions.
 
@@ -698,10 +769,10 @@ class KConsumer:
             current_offset = -1
             if tp.topic in self._positions and tp.partition in self._positions[tp.topic]:
                 current_offset = self._positions[tp.topic][tp.partition]
-            result.append(TopicPartition(tp.topic, tp.partition, current_offset))
+            result.append(confluent_kafka.TopicPartition(tp.topic, tp.partition, current_offset))
         return result
 
-    def seek(self, partition: TopicPartition) -> None:
+    def seek(self, partition: confluent_kafka.TopicPartition) -> None:
         """
         Set consume position for partition to offset.
 
@@ -737,7 +808,7 @@ class KConsumer:
 
         self.logger.debug("Seek to offset %d for %s[%d]", partition.offset, partition.topic, partition.partition)
 
-    def store_offsets(self, message: Optional[KMessage] = None, offsets: Optional[list[TopicPartition]] = None) -> None:
+    def store_offsets(self, message: Optional[KMessage] = None, offsets: Optional[list[confluent_kafka.TopicPartition]] = None) -> None:
         """
         Store offsets for a message or a list of offsets.
 
@@ -757,7 +828,7 @@ class KConsumer:
 
         # If message is provided, store its offset
         if message is not None:
-            stored_offsets.append(TopicPartition(message.topic(), message.partition(), message.offset() + 1))
+            stored_offsets.append(confluent_kafka.TopicPartition(message.topic(), message.partition(), message.offset() + 1))
 
         # If offsets are provided, store them
         elif offsets is not None:
@@ -771,7 +842,7 @@ class KConsumer:
 
         self.logger.debug("Stored offsets: %s", stored_offsets)
 
-    def pause(self, partitions: list[TopicPartition]) -> None:
+    def pause(self, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """
         Pause consumption for the provided list of partitions.
 
@@ -784,7 +855,7 @@ class KConsumer:
 
         self.logger.debug("Paused partitions: %s", self._paused_partitions)
 
-    def resume(self, partitions: list[TopicPartition]) -> None:
+    def resume(self, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """
         Resume consumption for the provided list of partitions.
 
@@ -799,7 +870,7 @@ class KConsumer:
 
         self.logger.debug("Resumed partitions, still paused: %s", self._paused_partitions)
 
-    def get_watermark_offsets(self, partition: TopicPartition) -> Optional[tuple[int, int]]:
+    def get_watermark_offsets(self, partition: confluent_kafka.TopicPartition) -> Optional[tuple[int, int]]:
         """
         Retrieve low and high offsets for the specified partition.
 
@@ -856,7 +927,7 @@ class KConsumer:
         else:
             raise KConsumerMaxRetryException(f"Exceeded max send retries ({self._max_retry_count})")
 
-    def _commit_offsets_async(self, offsets: list[TopicPartition]) -> None:
+    def _commit_offsets_async(self, offsets: list[confluent_kafka.TopicPartition]) -> None:
         """Commit offsets to the __consumer_offsets topic."""
         for offset in offsets:
             key = f"{self._group_id}:{offset.topic}:{offset.partition}".encode()

@@ -19,11 +19,12 @@
 import json
 from collections import defaultdict
 from threading import Lock
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Optional
 
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.schema_registry.schema_registry_client import RegisteredSchema, Schema, _BaseRestClient
 from kafka_mocha.schema_registry.srlogger import get_custom_logger
+from kafka_mocha.models.ktypes import LogLevelType
 
 
 class _SchemaStore(object):
@@ -147,15 +148,11 @@ class _SchemaStore(object):
 
 
 class MockSchemaRegistryClient(_BaseRestClient):
-    _instance = None
     _lock = Lock()
+    _instance = None
+    _is_running = False
 
-    def __new__(
-        cls,
-        conf: dict,
-        register_schemas: Optional[list[str]] = None,
-        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
-    ):
+    def __new__(cls, conf: dict, register_schemas: Optional[list[dict]] = None, loglevel: LogLevelType = "WARNING"):
         if not cls._instance:
             with cls._lock:
                 if not cls._instance:
@@ -165,22 +162,31 @@ class MockSchemaRegistryClient(_BaseRestClient):
     def __init__(
         self,
         conf: dict,
-        register_schemas: Optional[list[str]] = None,
-        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
+        register_schemas: Optional[list[dict]] = None,
+        loglevel: LogLevelType = "WARNING",
     ):
+        if self._is_running:
+            if register_schemas:
+                # Register new schemas even if the client is already running, increments schema version
+                self._register_schemas(register_schemas)
+            return
+
         super().__init__(conf)
         self._store = _SchemaStore()
         self.logger = get_custom_logger(loglevel)  # noqa F821
         if register_schemas:
             self._register_schemas(register_schemas)
 
+        self._is_running = True
         self.logger.debug("Mock Schema Registry Client initialized.")
 
-    def _register_schemas(self, register_schemas: list[str]) -> None:
+    def _register_schemas(self, register_schemas: list[dict[str, str]]) -> None:
         if isinstance(register_schemas, list):
             for schema in register_schemas:
-                file_name = schema.split("/")[-1]
+                source = schema["source"]
+                file_name = source.split("/")[-1]
                 extension = file_name.split(".")[-1]
+                subject_name = schema.get("subject", file_name + "-value")
                 if extension == "avsc":
                     schema_type = "AVRO"
                 elif extension == "json":
@@ -189,11 +195,11 @@ class MockSchemaRegistryClient(_BaseRestClient):
                     raise SchemaRegistryError(
                         400, 40002, "Unsupported schema file format, only AVRO and JSON are supported."
                     )
-                with open(schema, "r") as f:
+                with open(source, "r") as f:
                     avro_schema = json.loads(f.read())
                     avro_schema_str = json.dumps(avro_schema)
                     self.register_schema(
-                        file_name + "-value", Schema(schema_str=avro_schema_str, schema_type=schema_type)
+                        subject_name, Schema(schema_str=avro_schema_str, schema_type=schema_type)
                     )
         else:
             raise SchemaRegistryError(400, 40001, "Invalid schema file list format.")
