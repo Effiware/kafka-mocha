@@ -25,7 +25,7 @@ def invalid_configuration():
     consumer.list_topics(TOPIC_NAME)
 
 
-@mock_consumer(inputs=[{"source": LOCAL_INPUT, "topic": TOPIC_NAME + "-poll"}], loglevel="INFO")
+@mock_consumer(inputs=[{"source": LOCAL_INPUT, "topic": TOPIC_NAME + "-poll"}], loglevel="INFO", )
 def consume_preloaded_messages():
     """Mock consumer will consume preloaded messages from the topic.
 
@@ -46,7 +46,7 @@ def consume_preloaded_messages():
 
     poll_num = 0
     try:
-        while poll_num < 6:
+        while poll_num < 10:
             msg = consumer.poll(timeout=.3)
             if msg is None:
                 poll_num += 1
@@ -78,7 +78,7 @@ def consume_preloaded_messages_batched():
         }
     )
     consumer.subscribe([TOPIC_NAME + "-csm"])
-    msgs = consumer.consume(3, timeout=.5)
+    msgs = consumer.consume(10, timeout=.5)
     for msg in msgs:
         if msg.error():
             raise confluent_kafka.KafkaException(msg.error())
