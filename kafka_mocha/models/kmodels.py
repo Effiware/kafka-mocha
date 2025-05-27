@@ -79,7 +79,7 @@ class KMessage:
     def _check_key_value(obj: Optional[str | bytes]):
         """Check that key/value is a string or bytes."""
         if obj is not None and not isinstance(obj, str) and not isinstance(obj, bytes):
-            raise TypeError("Message's key/value must be a string or bytes")
+            raise TypeError(f"Message's key/value must be a string or bytes, got {type(obj).__name__}")
 
     @staticmethod
     def _check_headers(headers):
