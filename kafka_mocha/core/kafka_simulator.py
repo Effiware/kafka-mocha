@@ -75,6 +75,9 @@ class KafkaSimulator:
         # Consumer group management
         self._consumer_groups: dict[str, KConsumerGroup] = {}
         self._consumer_2_group: dict[int, str] = {}  # consumer_id -> group_id mapping
+        
+        # Transactional offset commits - keyed by (producer_id, transactional_id)
+        self._pending_transactional_offsets: dict[tuple[int, str], list[KMessage]] = defaultdict(list)
 
         # Start handlers
         self.producers_handler = self.handle_producers()
@@ -242,6 +245,9 @@ class KafkaSimulator:
                     KMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())
                 )
                 if not dry_run:
+                    # Commit pending transactional offset commits
+                    self._commit_pending_transactional_offsets(producer_id, transactional_id)
+                    
                     # Reset state
                     for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
@@ -257,6 +263,9 @@ class KafkaSimulator:
                 msg_value["state"] = "Abort"
                 msgs = [KMessage(self.TRANSACT_TOPIC, msg_partition, str(msg_key).encode(), str(msg_value).encode())]
                 if not dry_run:
+                    # Abort pending transactional offset commits
+                    self._abort_pending_transactional_offsets(producer_id, transactional_id)
+                    
                     # Reset state
                     for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
@@ -305,6 +314,15 @@ class KafkaSimulator:
                     msg.set_timestamp(last_received_msg_ts, MESSAGE_TIMESTAMP_TYPE)
                     partition.append(msg)
                     logger.debug("Appended message: %s", msg)
+                    
+                    # Handle offset commits to update consumer group state
+                    if msg.topic() == "__consumer_offsets" and not msg._marker:
+                        if msg._pid and self._is_transactional_producer(msg._pid):
+                            # This is a transactional offset commit - store it pending
+                            self._store_pending_transactional_offset(msg)
+                        else:
+                            # Regular offset commit - process immediately
+                            self._process_offset_commit(msg)
 
     def handle_consumers(self):
         """A separate generator function that yields a signal to the caller. Handles delivering messages to consumer.
@@ -481,6 +499,86 @@ class KafkaSimulator:
             render(_format, self.topics, **output)
         else:
             logger.error("No output format has been set. Rendering skipped.")
+
+    def _process_offset_commit(self, message: KMessage) -> None:
+        """Process offset commit message and update consumer group state."""
+        try:
+            # Parse the offset commit message
+            key = message.key().decode() if isinstance(message.key(), bytes) else message.key()
+            value = message.value(None).decode() if isinstance(message.value(None), bytes) else message.value(None)
+            
+            # Expected format: "group_id:topic:partition"
+            group_id, topic, partition_str = key.split(':', 2)
+            partition = int(partition_str)
+            offset = int(value)
+            
+            # Update consumer group offsets
+            if group_id in self._consumer_groups:
+                consumer_group = self._consumer_groups[group_id]
+                if topic not in consumer_group.offsets:
+                    consumer_group.offsets[topic] = {}
+                consumer_group.offsets[topic][partition] = offset
+                
+                logger.debug("Updated offset for group %s, topic %s, partition %d to %d", 
+                           group_id, topic, partition, offset)
+            else:
+                logger.debug("Consumer group %s not found for offset commit", group_id)
+                
+        except (ValueError, AttributeError) as e:
+            logger.warning("Failed to process offset commit message: %s", e)
+
+    def _is_transactional_producer(self, producer_id: int) -> bool:
+        """Check if a producer ID belongs to a transactional producer."""
+        for transactional_id, producers in self._registered_transact_ids.items():
+            if any(p.producer_id == producer_id for p in producers):
+                return True
+        return False
+
+    def _get_transactional_id_for_producer(self, producer_id: int) -> Optional[str]:
+        """Get the transactional ID for a given producer ID."""
+        for transactional_id, producers in self._registered_transact_ids.items():
+            if any(p.producer_id == producer_id for p in producers):
+                return transactional_id
+        return None
+
+    def _store_pending_transactional_offset(self, message: KMessage) -> None:
+        """Store a transactional offset commit message in pending state."""
+        producer_id = message._pid
+        transactional_id = self._get_transactional_id_for_producer(producer_id)
+        
+        if transactional_id:
+            key = (producer_id, transactional_id)
+            self._pending_transactional_offsets[key].append(message)
+            logger.debug("Stored pending transactional offset commit for producer %d, transaction %s", 
+                        producer_id, transactional_id)
+
+    def _commit_pending_transactional_offsets(self, producer_id: int, transactional_id: str) -> None:
+        """Commit all pending transactional offset commits for a producer."""
+        key = (producer_id, transactional_id)
+        pending_offsets = self._pending_transactional_offsets.get(key, [])
+        
+        logger.debug("Committing %d pending transactional offset commits for producer %d, transaction %s", 
+                    len(pending_offsets), producer_id, transactional_id)
+        
+        # Process all pending offset commits
+        for message in pending_offsets:
+            self._process_offset_commit(message)
+        
+        # Clear the pending offsets
+        if key in self._pending_transactional_offsets:
+            del self._pending_transactional_offsets[key]
+
+    def _abort_pending_transactional_offsets(self, producer_id: int, transactional_id: str) -> None:
+        """Abort (discard) all pending transactional offset commits for a producer."""
+        key = (producer_id, transactional_id)
+        pending_count = len(self._pending_transactional_offsets.get(key, []))
+        
+        logger.debug("Aborting %d pending transactional offset commits for producer %d, transaction %s", 
+                    pending_count, producer_id, transactional_id)
+        
+        # Clear the pending offsets without processing them
+        if key in self._pending_transactional_offsets:
+            del self._pending_transactional_offsets[key]
 
     def __del__(self):
         logger.debug("Kafka Simulator has been terminated.")

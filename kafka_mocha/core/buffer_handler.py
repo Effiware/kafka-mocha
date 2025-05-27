@@ -148,7 +148,7 @@ def buffer_handler(
                             )
                         )
                 kafka_handler.send(markers_buffer)
-                transact_cache = dict()
+                transact_cache = defaultdict(list)
 
             else:
                 # (Normal) PMessage received
