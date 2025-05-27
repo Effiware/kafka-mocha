@@ -17,7 +17,7 @@ LOCAL_INPUT = str(os.path.join(os.path.dirname(__file__), "inputs/users-registra
 
 
 @mock_schema_registry(register_schemas=[{"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}])
-@mock_consumer(inputs=[{"source": LOCAL_INPUT, "topic": TOPIC_NAME, "serialize": True}], loglevel="DEBUG", )
+@mock_consumer(inputs=[{"source": LOCAL_INPUT, "topic": TOPIC_NAME, "serialize": True}],)
 def consume_preloaded_json_serialized_messages():
     """Mock consumer will consume preloaded messages (serialized to JSON) from the topic.
 
@@ -42,7 +42,7 @@ def consume_preloaded_json_serialized_messages():
         conf={"use.latest.version": True},
     )
 
-    msgs = consumer.consume(3, timeout=.5)
+    msgs = consumer.consume(10, timeout=.5)
     for msg in msgs:
         if msg.error():
             raise confluent_kafka.KafkaException(msg.error())

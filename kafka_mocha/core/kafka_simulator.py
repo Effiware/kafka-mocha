@@ -312,8 +312,9 @@ class KafkaSimulator:
         :note: Separate/common event-loop-like for handling producers/consumers are being tested.
         """
         logger.info("Handle consumers has been primed")
+        result = KSignals.SUCCESS
         while True:
-            request = yield KSignals.SUCCESS
+            request = yield result
             if isinstance(request, tuple) and len(request) == 3:
                 # Handle a poll request: (consumer_id, topic_partitions, max_records)
                 consumer_id, topic_partitions, max_records = request
@@ -329,7 +330,7 @@ class KafkaSimulator:
                     messages += partition.get_by_offset(tp.offset, max_records)
 
                 logger.debug("Consumer %d polling, found %d messages", consumer_id, len(messages))
-                yield messages
+                result = messages
 
             elif isinstance(request, TopicPartition):
                 # Handle a seek request
@@ -341,11 +342,12 @@ class KafkaSimulator:
                 topic = next((t for t in self.topics if t.name == topic_name), None)
                 if topic is None:
                     logger.warning("Seek request for unknown topic: %s", topic_name)
+                    result = KSignals.SUCCESS
                     continue
 
                 # Process the request
                 logger.warning("Consumer seeking to offset %d for %s[%d]", offset, topic_name, partition_id)
-                # Actual seek logic is handled in the consumer since we just return messages
+                result = KSignals.SUCCESS
 
             else:
                 raise KafkaSimulatorProcessingException(f"Unknown request type in consumer handler: {type(request)}")

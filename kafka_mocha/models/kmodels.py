@@ -248,12 +248,13 @@ class KPartition:
 
     def get_by_offset(self, offset: int = 0, batch_size: int = 1) -> list[KMessage]:
         """Get messages starting from a specific (or the closest) offset ."""
-        found_idx = 0
+        found_idx = None
         for idx, msq in enumerate(self._heap):
             if msq.offset() is not None and msq.offset() >= offset:
                 found_idx = idx
                 break
-        return self._heap[found_idx : found_idx + batch_size]
+
+        return self._heap[found_idx : found_idx + batch_size] if found_idx is not None else []
 
     def get_by_timestamp(self, timestamp: int, batch_size: int = 1) -> list[KMessage]:
         """Get messages starting from a specific timestamp."""
