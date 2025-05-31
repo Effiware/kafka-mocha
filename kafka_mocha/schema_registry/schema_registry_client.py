@@ -16,6 +16,7 @@
 # limitations under the License.
 #
 
+import json
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union, cast
 from urllib.parse import unquote, urlparse
@@ -583,7 +584,7 @@ class Schema:
         d = src_dict.copy()
 
         schema = d.pop("schema", None)
-
+        schema_str = json.dumps(schema)
         schema_type = d.pop("schemaType", "AVRO")
 
         references = []
@@ -611,15 +612,13 @@ class Schema:
 
         rule_set = _parse_rule_set(d.pop("ruleSet", None))
 
-        schema = cls(
-            schema_str=schema,
+        return cls(
+            schema_str=schema_str,
             schema_type=schema_type,
             references=references,
             metadata=metadata,
             rule_set=rule_set,
         )
-
-        return schema
 
     # def __eq__(self, other):
     #     if not isinstance(other, Schema):
