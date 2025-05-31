@@ -15,10 +15,15 @@ from kafka_mocha.schema_registry import mock_schema_registry
 from kafka_mocha.schema_registry.mock_schema_registry_client import MockSchemaRegistryClient
 
 TOPIC_NAME = "user-registered-prod-avsc"
+LOCAL_ENVELOPE = str(os.path.join(os.path.dirname(__file__), "schemas/event-envelope.avsc"))
 LOCAL_SCHEMA = str(os.path.join(os.path.dirname(__file__), "schemas/user-registered.avsc"))
 
 
-@mock_schema_registry(loglevel="INFO", register_schemas=[{"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}])
+@mock_schema_registry(loglevel="INFO", register_schemas=[
+    {"source": LOCAL_ENVELOPE, "subject": "com.example.EventEnvelope"},
+    {"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}
+    ]
+)
 @mock_producer(output={"format": "csv"})
 def use_latest_registered_schema():
     """
@@ -57,6 +62,7 @@ def auto_register_schema():
     """
     producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
     schema_registry = MockSchemaRegistryClient({"url": "http://localhost:8081"})
+
     with open(LOCAL_SCHEMA, "r") as f:
         avro_schema = json.loads(f.read())
         avro_schema_str = json.dumps(avro_schema)
@@ -79,7 +85,11 @@ def auto_register_schema():
     producer.flush()
 
 
-@mock_schema_registry(register_schemas=[{"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}])
+@mock_schema_registry(
+    register_schemas=[
+        {"source": LOCAL_ENVELOPE, "subject": "com.example.EventEnvelope"},
+        {"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}
+    ])
 @mock_producer()
 def use_any_registered_schema():
     """
