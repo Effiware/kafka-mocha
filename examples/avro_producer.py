@@ -113,7 +113,7 @@ def use_any_registered_schema():
     schema and produce message to Kafka.
 
     >>> use_any_registered_schema()
-    AVRO message delivered (auto.register.schemas = False, use.latest.version = False)
+    AVRO message delivered (auto.register.schemas = False, use.schema.id)
     """
     producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
     schema_registry = confluent_kafka.schema_registry.SchemaRegistryClient({"url": "http://localhost:8081"})
@@ -139,7 +139,7 @@ def use_any_registered_schema():
         key=string_serializer(str(user_id)),
         value=avro_serializer(event.to_dict(), SerializationContext(TOPIC_NAME, MessageField.VALUE)),
         on_delivery=lambda err, msg: print(
-            "AVRO message delivered (auto.register.schemas = False, use.latest.version = False)"
+            "AVRO message delivered (auto.register.schemas = False, use.schema.id)"
         ),
     )
     producer.flush()
