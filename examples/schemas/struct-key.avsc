@@ -1,19 +1,26 @@
 {
+  "schemaType": "AVRO",
+  "schema": {
     "name": "StructKey",
     "namespace": "com.example.key.struct",
     "doc": "Structural message key",
     "type": "record",
     "fields": [
-        {
-            "name": "id",
-            "type": "string",
-            "logicalType": "uuid"
-        },
-        {
-            "name": "type",
-            "type": ["null", "string"],
-            "default": null,
-            "doc": "Optional type of the key, e.g., 'legacy', 'external', etc."
-        }
+      {
+        "name": "id",
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      {
+        "name": "type",
+        "type": [
+          "null",
+          "string"
+        ],
+        "default": null,
+        "doc": "Optional type of the key, e.g., 'legacy', 'external', etc."
+      }
     ]
+  },
+  "references": []
 }

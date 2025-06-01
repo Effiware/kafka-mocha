@@ -2,12 +2,13 @@ import json
 import signal
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Callable, Optional, Literal
+from typing import Any, Callable, Literal, Optional
 
 import confluent_kafka
+import confluent_kafka.schema_registry
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.schema_registry.json_schema import JSONSerializer
-from confluent_kafka.serialization import SerializationContext, MessageField, StringSerializer, IntegerSerializer
+from confluent_kafka.serialization import IntegerSerializer, MessageField, SerializationContext, StringSerializer
 
 from kafka_mocha.core.buffer_handler import buffer_handler
 from kafka_mocha.core.kafka_simulator import KafkaSimulator
@@ -20,6 +21,20 @@ from kafka_mocha.models.signals import KSignals, Tick
 from kafka_mocha.schema_registry import MockSchemaRegistryClient
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.utils import validate_config
+
+
+def _get_subject_name_strategy_call(
+    subject_name_strategy: Literal["topic", "topic_record", "record"] = "topic",
+) -> Callable:
+    """
+    Get the subject name for the given topic and field type using the provided subject name strategy.
+    """
+    if subject_name_strategy == "topic_record":
+        return confluent_kafka.schema_registry.topic_record_subject_name_strategy
+    elif subject_name_strategy == "record":
+        return confluent_kafka.schema_registry.record_subject_name_strategy
+    else:
+        return confluent_kafka.schema_registry.topic_subject_name_strategy
 
 
 class KConsumer:
@@ -82,7 +97,7 @@ class KConsumer:
             )
             self._ticking_thread.daemon = True  # TODO 34: Workaround for #34 bug/34-tickingthread-never-joins
             self._ticking_thread.start()
-        
+
         self.logger.info("KConsumer initialized, id: %s, group: %s", id(self), self._group_id)
 
     def _inputs_upload(self, inputs: list[InputFormat]) -> None:
@@ -94,26 +109,19 @@ class KConsumer:
             with open(_input["source"], "r") as file:
                 messages: list[dict] = json.loads(file.read())
                 for message in messages:
+                    topic = _input["topic"]
+                    sns = _input.get("subject_name_strategy")
+
                     key_field = message.get("key", None)
                     key = key_field["payload"] if key_field else None
                     value_field = message.get("value", None)
                     value = value_field["payload"] if value_field else None
                     headers = message.get("headers", None)
-
-                    # if isinstance(key, dict):
-                    #     if _input.get("serialize", False) and key_field and key_field.get("subject"):
-                    #         key = self._input_serialize(key_field, "KEY", _input["topic"])
-                    #     else:
-                    #         key = json.dumps(key)
-                    # if isinstance(value, dict):
-                    #     if _input.get("serialize", False) and value_field and value_field.get("subject"):
-                    #         value = self._input_serialize(value_field, "VALUE", _input["topic"])
-                    #     else:
-                    #         value = json.dumps(value)
+                    
                     if _input.get("serialize", False):
                         if isinstance(key, dict):
                             if key_field and key_field.get("subject"):
-                                key = self._input_serialize(key_field, "KEY", _input["topic"])
+                                key = self._input_serialize(key_field, "KEY", topic, sns)
                             else:
                                 key = StringSerializer()(json.dumps(key))
                         elif isinstance(key, int):
@@ -123,7 +131,7 @@ class KConsumer:
 
                         if isinstance(value, dict):
                             if value_field and value_field.get("subject"):
-                                value = self._input_serialize(value_field, "VALUE", _input["topic"])
+                                value = self._input_serialize(value_field, "VALUE", topic, sns)
                             else:
                                 value = StringSerializer()(json.dumps(value))
                         elif isinstance(value, int):
@@ -134,11 +142,13 @@ class KConsumer:
                         key = json.dumps(key) if isinstance(key, dict) else key
                         value = json.dumps(value) if isinstance(value, dict) else value
 
-                    self._buffer_handler.send(KMessage(_input.get("topic"), -1, key, value, headers))
+                    self._buffer_handler.send(KMessage(topic, -1, key, value, headers))
 
                 self._tick_buffer()
 
-    def _input_serialize(self, field: dict[str, str], ftype: Literal["KEY", "VALUE"], topic: str) -> bytes:
+    def _input_serialize(
+        self, field: dict[str, str], ftype: Literal["KEY", "VALUE"], topic: str, subject_name_strategy: Optional[str]
+    ) -> bytes:
         """Serialize input data based on the input format. Get schema from the mock schema registry."""
         if self._schema_registry is None:
             self._schema_registry = MockSchemaRegistryClient({"url": "http://localhost:8081"})
@@ -151,18 +161,23 @@ class KConsumer:
                 f"Available subjects: {self._schema_registry.get_subjects()}"
             )
 
+        _sns = (
+            _get_subject_name_strategy_call(subject_name_strategy)
+            if subject_name_strategy
+            else _get_subject_name_strategy_call()
+        )
         if field["schemaType"] == "JSON":
             json_serializer = JSONSerializer(
                 schema_registry_client=self._schema_registry,
                 schema_str=reg_schema.schema,
-                conf={"auto.register.schemas": False, "use.latest.version": True},
+                conf={"auto.register.schemas": False, "use.latest.version": True, "subject.name.strategy": _sns},
             )
             return json_serializer(field["payload"], SerializationContext(topic, MessageField[ftype]))
         elif field["schemaType"] == "AVRO":
             avro_serializer = AvroSerializer(
                 self._schema_registry,
                 reg_schema.schema,
-                conf={"auto.register.schemas": False, "use.latest.version": True},
+                conf={"auto.register.schemas": False, "use.latest.version": True, "subject.name.strategy": _sns},
             )
             return avro_serializer(field["payload"], SerializationContext(topic, MessageField[ftype]))
         else:
@@ -308,7 +323,9 @@ class KConsumer:
 
         # If message is provided, create an offset for it
         if message is not None:
-            offsets_to_commit.append(confluent_kafka.TopicPartition(message.topic(), message.partition(), message.offset() + 1))
+            offsets_to_commit.append(
+                confluent_kafka.TopicPartition(message.topic(), message.partition(), message.offset() + 1)
+            )
         # If offsets are provided, use them
         elif offsets is not None:
             offsets_to_commit = offsets
@@ -808,7 +825,9 @@ class KConsumer:
 
         self.logger.debug("Seek to offset %d for %s[%d]", partition.offset, partition.topic, partition.partition)
 
-    def store_offsets(self, message: Optional[KMessage] = None, offsets: Optional[list[confluent_kafka.TopicPartition]] = None) -> None:
+    def store_offsets(
+        self, message: Optional[KMessage] = None, offsets: Optional[list[confluent_kafka.TopicPartition]] = None
+    ) -> None:
         """
         Store offsets for a message or a list of offsets.
 
@@ -828,7 +847,9 @@ class KConsumer:
 
         # If message is provided, store its offset
         if message is not None:
-            stored_offsets.append(confluent_kafka.TopicPartition(message.topic(), message.partition(), message.offset() + 1))
+            stored_offsets.append(
+                confluent_kafka.TopicPartition(message.topic(), message.partition(), message.offset() + 1)
+            )
 
         # If offsets are provided, store them
         elif offsets is not None:

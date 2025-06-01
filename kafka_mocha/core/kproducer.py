@@ -148,7 +148,6 @@ class KProducer:
         self, positions: list[confluent_kafka.TopicPartition], group_metadata: object, timeout: float = None
     ):
         """Duck type for confluent_kafka/cimpl.py::send_offsets_to_transaction (see signature there).
-        
         Sends consumer group offsets to a transaction coordinator as part of a transaction.
         These offsets will be committed atomically with the transaction.
         """
@@ -160,9 +159,9 @@ class KProducer:
                     fatal=True,
                 )
             )
-            
+
         # Extract group_id from metadata
-        if not hasattr(group_metadata, 'group_id'):
+        if not hasattr(group_metadata, "group_id"):
             raise confluent_kafka.KafkaException(
                 confluent_kafka.KafkaError(
                     confluent_kafka.KafkaError._INVALID_ARG,
@@ -170,20 +169,19 @@ class KProducer:
                     fatal=False,
                 )
             )
-            
+
         group_id = group_metadata.group_id
-        
+
         # Send offset commits as transactional messages
         for position in positions:
             if position.offset >= 0:  # Only commit valid offsets
                 key = f"{group_id}:{position.topic}:{position.partition}".encode()
                 value = str(position.offset).encode()
-                
                 # Create an offset commit message (will be part of the transaction)
                 # Mark with producer ID so the simulator knows this is transactional
                 message = KMessage("__consumer_offsets", -1, key, value, timestamp=0, pid=id(self))
                 self._send_with_retry(message)
-                
+
         self.logger.debug("Sent offsets to transaction: %s for group: %s", positions, group_id)
 
     def set_sasl_credentials(self, *args, **kwargs):

@@ -2,14 +2,15 @@ import doctest
 import os
 
 import confluent_kafka
-from confluent_kafka.schema_registry.avro import AvroSerializer, AvroDeserializer
-from confluent_kafka.serialization import SerializationContext, MessageField
+from confluent_kafka.schema_registry.avro import AvroDeserializer, AvroSerializer
+from confluent_kafka.serialization import MessageField, SerializationContext
 
 from kafka_mocha import mock_consumer, mock_producer
 from kafka_mocha.schema_registry import mock_schema_registry
 
 INPUT_TOPIC = "user-registered-cons-avro-2"
 OUTPUT_TOPIC = "user-registered-cons-avro-out"
+LOCAL_ENVELOPE = str(os.path.join(os.path.dirname(__file__), "schemas/event-envelope.avsc"))
 LOCAL_SCHEMA_KEY = str(os.path.join(os.path.dirname(__file__), "schemas/struct-key.avsc"))
 LOCAL_SCHEMA_VALUE = str(os.path.join(os.path.dirname(__file__), "schemas/user-registered.avsc"))
 LOCAL_INPUT = str(os.path.join(os.path.dirname(__file__), "inputs/users-registrations-in-avro-2.json"))
@@ -17,6 +18,7 @@ LOCAL_INPUT = str(os.path.join(os.path.dirname(__file__), "inputs/users-registra
 
 @mock_schema_registry(
     register_schemas=[
+        {"source": LOCAL_ENVELOPE, "subject": "com.example.EventEnvelope"},
         {"source": LOCAL_SCHEMA_KEY, "subject": INPUT_TOPIC + "-key"},
         {"source": LOCAL_SCHEMA_VALUE, "subject": INPUT_TOPIC + "-value"},
         {"source": LOCAL_SCHEMA_KEY, "subject": OUTPUT_TOPIC + "-key"},
@@ -50,8 +52,7 @@ def transact_consume_preloaded_messages_and_produce():
             "bootstrap.servers": "localhost:9092",
             "enable.idempotence": True,
             "transactional.id": "test-transact-prosumer-id",
-
-         }
+        }
     )
 
     avro_deserializer = AvroDeserializer(schema_registry, conf={"use.latest.version": True})
@@ -93,8 +94,7 @@ def transact_consume_preloaded_messages_and_produce():
                 )
 
                 producer.send_offsets_to_transaction(
-                    consumer.position(consumer.assignment()),
-                    consumer.consumer_group_metadata()
+                    consumer.position(consumer.assignment()), consumer.consumer_group_metadata()
                 )
                 producer.commit_transaction()
 
@@ -106,8 +106,7 @@ def transact_consume_preloaded_messages_and_produce():
         producer.abort_transaction()
     else:
         producer.send_offsets_to_transaction(
-            consumer.position(consumer.assignment()),
-            consumer.consumer_group_metadata()
+            consumer.position(consumer.assignment()), consumer.consumer_group_metadata()
         )
         producer.commit_transaction()
     finally:

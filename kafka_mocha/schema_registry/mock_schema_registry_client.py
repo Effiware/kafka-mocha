@@ -21,6 +21,7 @@ from collections import defaultdict
 from threading import Lock
 from typing import Dict, List, Optional
 
+from kafka_mocha.models.ktypes import LogLevelType
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.schema_registry.schema_registry_client import RegisteredSchema, Schema, _BaseRestClient
 from kafka_mocha.schema_registry.srlogger import get_custom_logger
@@ -62,7 +63,8 @@ class _SchemaStore(object):
                     # if rs.schema == schema:  # For some reason, this comparison is not working
                     #     return rs
                     if (
-                        rs.schema.schema_str == schema.schema_str
+                        schema is not None
+                        and rs.schema.schema_str == schema.schema_str
                         and rs.schema.schema_type == schema.schema_type
                         and rs.schema.references == schema.references
                         and rs.schema.metadata == schema.metadata
@@ -187,20 +189,13 @@ class MockSchemaRegistryClient(_BaseRestClient):
                 file_name = source.split("/")[-1]
                 extension = file_name.split(".")[-1]
                 subject_name = schema.get("subject", file_name + "-value")
-                if extension == "avsc":
-                    schema_type = "AVRO"
-                elif extension == "json":
-                    schema_type = "JSON"
-                else:
+                if extension not in ["avsc", "json"]:
                     raise SchemaRegistryError(
-                        400, 40002, "Unsupported schema file format, only AVRO and JSON are supported."
+                        400, 40002, "Unsupported schema file format, only AVRO (avsc) and JSON are supported."
                     )
                 with open(source, "r") as f:
-                    avro_schema = json.loads(f.read())
-                    avro_schema_str = json.dumps(avro_schema)
-                    self.register_schema(
-                        subject_name, Schema(schema_str=avro_schema_str, schema_type=schema_type)
-                    )
+                    _schema = json.loads(f.read())
+                    self.register_schema(subject_name, Schema.from_dict(_schema))
         else:
             raise SchemaRegistryError(400, 40001, "Invalid schema file list format.")
 

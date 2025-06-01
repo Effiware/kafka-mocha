@@ -6,7 +6,6 @@ from threading import Lock
 from typing import Any, Literal, NamedTuple, Optional
 
 import confluent_kafka
-from confluent_kafka import TopicPartition
 from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
 from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaSimulatorProcessingException
@@ -75,7 +74,7 @@ class KafkaSimulator:
         # Consumer group management
         self._consumer_groups: dict[str, KConsumerGroup] = {}
         self._consumer_2_group: dict[int, str] = {}  # consumer_id -> group_id mapping
-        
+
         # Transactional offset commits - keyed by (producer_id, transactional_id)
         self._pending_transactional_offsets: dict[tuple[int, str], list[KMessage]] = defaultdict(list)
 
@@ -247,7 +246,7 @@ class KafkaSimulator:
                 if not dry_run:
                     # Commit pending transactional offset commits
                     self._commit_pending_transactional_offsets(producer_id, transactional_id)
-                    
+
                     # Reset state
                     for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
@@ -314,7 +313,7 @@ class KafkaSimulator:
                     msg.set_timestamp(last_received_msg_ts, MESSAGE_TIMESTAMP_TYPE)
                     partition.append(msg)
                     logger.debug("Appended message: %s", msg)
-                    
+
                     # Handle offset commits to update consumer group state
                     if msg.topic() == "__consumer_offsets" and not msg._marker:
                         if msg._pid and self._is_transactional_producer(msg._pid):
@@ -350,7 +349,7 @@ class KafkaSimulator:
                 logger.debug("Consumer %d polling, found %d messages", consumer_id, len(messages))
                 result = messages
 
-            elif isinstance(request, TopicPartition):
+            elif isinstance(request, confluent_kafka.TopicPartition):
                 # Handle a seek request
                 topic_name = request.topic
                 partition_id = request.partition
@@ -456,12 +455,14 @@ class KafkaSimulator:
             # The actual notification of consumers is done through the KConsumer.subscribe method
             # which will query for its assignment
 
-    def assign_partitions(self, consumer_id: int, partitions: list[TopicPartition]) -> None:
+    def assign_partitions(self, consumer_id: int, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """Manually assign partitions to a consumer (outside of consumer groups)."""
         # For manual partition assignment, we don't involve consumer groups
         logger.debug("Manually assigning partitions to consumer %d: %s", consumer_id, partitions)
 
-    def get_committed_offsets(self, consumer_id: int, partitions: list[TopicPartition]) -> list[TopicPartition]:
+    def get_committed_offsets(
+        self, consumer_id: int, partitions: list[confluent_kafka.TopicPartition]
+    ) -> list[confluent_kafka.TopicPartition]:
         """Get committed offsets for a consumer."""
         result = []
 
@@ -472,11 +473,11 @@ class KafkaSimulator:
             if group_id in self._consumer_groups:
                 for tp in partitions:
                     offset = self._consumer_groups[group_id].get_offset(tp.topic, tp.partition)
-                    result.append(TopicPartition(tp.topic, tp.partition, offset))
+                    result.append(confluent_kafka.TopicPartition(tp.topic, tp.partition, offset))
 
         return result
 
-    def _rebalance_group(self, group_id: str) -> dict[int, list[TopicPartition]]:
+    def _rebalance_group(self, group_id: str) -> dict[int, list[confluent_kafka.TopicPartition]]:
         """Rebalance a consumer group and return the new assignments."""
         if group_id not in self._consumer_groups:
             return {}
@@ -484,7 +485,7 @@ class KafkaSimulator:
         logger.debug("Rebalancing consumer group %s", group_id)
         return self._consumer_groups[group_id].rebalance(self.topics)
 
-    def get_member_assignment(self, consumer_id: int) -> list[TopicPartition]:
+    def get_member_assignment(self, consumer_id: int) -> list[confluent_kafka.TopicPartition]:
         """Get the current assignment for a consumer."""
         if consumer_id in self._consumer_2_group:
             group_id = self._consumer_2_group[consumer_id]
@@ -506,24 +507,25 @@ class KafkaSimulator:
             # Parse the offset commit message
             key = message.key().decode() if isinstance(message.key(), bytes) else message.key()
             value = message.value(None).decode() if isinstance(message.value(None), bytes) else message.value(None)
-            
+
             # Expected format: "group_id:topic:partition"
-            group_id, topic, partition_str = key.split(':', 2)
+            group_id, topic, partition_str = key.split(":", 2)
             partition = int(partition_str)
             offset = int(value)
-            
+
             # Update consumer group offsets
             if group_id in self._consumer_groups:
                 consumer_group = self._consumer_groups[group_id]
                 if topic not in consumer_group.offsets:
                     consumer_group.offsets[topic] = {}
-                consumer_group.offsets[topic][partition] = offset
                 
-                logger.debug("Updated offset for group %s, topic %s, partition %d to %d", 
-                           group_id, topic, partition, offset)
+                consumer_group.offsets[topic][partition] = offset
+                logger.debug(
+                    "Updated offset for group %s, topic %s, partition %d to %d", group_id, topic, partition, offset
+                )
             else:
                 logger.debug("Consumer group %s not found for offset commit", group_id)
-                
+
         except (ValueError, AttributeError) as e:
             logger.warning("Failed to process offset commit message: %s", e)
 
@@ -545,25 +547,32 @@ class KafkaSimulator:
         """Store a transactional offset commit message in pending state."""
         producer_id = message._pid
         transactional_id = self._get_transactional_id_for_producer(producer_id)
-        
+
         if transactional_id:
             key = (producer_id, transactional_id)
             self._pending_transactional_offsets[key].append(message)
-            logger.debug("Stored pending transactional offset commit for producer %d, transaction %s", 
-                        producer_id, transactional_id)
+            logger.debug(
+                "Stored pending transactional offset commit for producer %d, transaction %s",
+                producer_id,
+                transactional_id,
+            )
 
     def _commit_pending_transactional_offsets(self, producer_id: int, transactional_id: str) -> None:
         """Commit all pending transactional offset commits for a producer."""
         key = (producer_id, transactional_id)
         pending_offsets = self._pending_transactional_offsets.get(key, [])
-        
-        logger.debug("Committing %d pending transactional offset commits for producer %d, transaction %s", 
-                    len(pending_offsets), producer_id, transactional_id)
-        
+
+        logger.debug(
+            "Committing %d pending transactional offset commits for producer %d, transaction %s",
+            len(pending_offsets),
+            producer_id,
+            transactional_id,
+        )
+
         # Process all pending offset commits
         for message in pending_offsets:
             self._process_offset_commit(message)
-        
+
         # Clear the pending offsets
         if key in self._pending_transactional_offsets:
             del self._pending_transactional_offsets[key]
@@ -572,10 +581,14 @@ class KafkaSimulator:
         """Abort (discard) all pending transactional offset commits for a producer."""
         key = (producer_id, transactional_id)
         pending_count = len(self._pending_transactional_offsets.get(key, []))
-        
-        logger.debug("Aborting %d pending transactional offset commits for producer %d, transaction %s", 
-                    pending_count, producer_id, transactional_id)
-        
+
+        logger.debug(
+            "Aborting %d pending transactional offset commits for producer %d, transaction %s",
+            pending_count,
+            producer_id,
+            transactional_id,
+        )
+
         # Clear the pending offsets without processing them
         if key in self._pending_transactional_offsets:
             del self._pending_transactional_offsets[key]

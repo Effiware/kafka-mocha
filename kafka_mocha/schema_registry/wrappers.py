@@ -2,6 +2,7 @@ from functools import partial, wraps
 from typing import Optional
 from unittest.mock import patch
 
+from kafka_mocha.models.ktypes import LogLevelType
 from kafka_mocha.schema_registry.mock_schema_registry_client import MockSchemaRegistryClient
 from kafka_mocha.models.ktypes import LogLevelType
 

@@ -1,54 +1,76 @@
 {
+  "schemaType": "JSON",
+  "schema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "UserRegistered",
-    "$id": "com.example.user.actions/UserRegistered",
+    "$id": "com.example.user.actions.UserRegistered",
     "description": "User registered event schema",
     "type": "object",
     "properties": {
-        "user_id": {
+      "user_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "user_name": {
+        "type": "string"
+      },
+      "user_last_name": {
+        "type": "string"
+      },
+      "is_new_user": {
+        "type": "boolean"
+      },
+      "subscription_type": {
+        "type": "string",
+        "enum": [
+          "FREE",
+          "LITE",
+          "PRO"
+        ]
+      },
+      "registration_timestamp": {
+        "type": "integer",
+        "format": "date-time"
+      },
+      "score": {
+        "type": "number"
+      },
+      "envelope": {
+        "type": "object",
+        "properties": {
+          "envelope_id": {
             "type": "string",
             "format": "uuid"
-        },
-        "user_name": {
-            "type": "string"
-        },
-        "user_last_name": {
-            "type": "string"
-        },
-        "is_new_user": {
-            "type": "boolean"
-        },
-        "subscription_type": {
-            "type": "string",
-            "enum": ["FREE", "LITE", "PRO"]
-        },
-        "registration_timestamp": {
+          },
+          "event_timestamp": {
             "type": "integer",
             "format": "date-time"
+          },
+          "app_name": {
+            "type": "string"
+          },
+          "app_version": {
+            "type": "string"
+          }
         },
-        "score": {
-            "type": "number"
-        },
-        "envelope": {
-            "type": "object",
-            "properties": {
-                "envelope_id": {
-                    "type": "string",
-                    "format": "uuid"
-                },
-                "event_timestamp": {
-                    "type": "integer",
-                    "format": "date-time"
-                },
-                "app_name": {
-                    "type": "string"
-                },
-                "app_version": {
-                    "type": "string"
-                }
-            },
-            "required": ["envelope_id", "event_timestamp", "app_name", "app_version"]
-        }
+        "required": [
+          "envelope_id",
+          "event_timestamp",
+          "app_name",
+          "app_version"
+        ]
+      }
     },
-    "required": ["user_id", "user_name", "user_last_name", "is_new_user", "subscription_type", "registration_timestamp", "score", "envelope"]
+    "required": [
+      "user_id",
+      "user_name",
+      "user_last_name",
+      "is_new_user",
+      "subscription_type",
+      "registration_timestamp",
+      "score",
+      "envelope"
+    ]
+  },
+  "references": []
 }
