@@ -25,9 +25,7 @@ LOCAL_INPUT = str(os.path.join(os.path.dirname(__file__), "inputs/users-registra
         {"source": LOCAL_SCHEMA_VALUE, "subject": OUTPUT_TOPIC + "-value"},
     ]
 )
-@mock_consumer(
-    inputs=[{"source": LOCAL_INPUT, "topic": INPUT_TOPIC, "serialize": True}]
-)
+@mock_consumer(inputs=[{"source": LOCAL_INPUT, "topic": INPUT_TOPIC, "serialize": True}])
 @mock_producer(output={"format": "csv"})
 def transact_consume_preloaded_messages_and_produce():
     """
@@ -54,8 +52,7 @@ def transact_consume_preloaded_messages_and_produce():
             "bootstrap.servers": "localhost:9092",
             "enable.idempotence": True,
             "transactional.id": "test-transact-prosumer-id",
-
-         }
+        }
     )
 
     avro_deserializer = AvroDeserializer(schema_registry, conf={"use.latest.version": True})
@@ -97,8 +94,7 @@ def transact_consume_preloaded_messages_and_produce():
                 )
 
                 producer.send_offsets_to_transaction(
-                    consumer.position(consumer.assignment()),
-                    consumer.consumer_group_metadata()
+                    consumer.position(consumer.assignment()), consumer.consumer_group_metadata()
                 )
                 producer.commit_transaction()
 
@@ -110,8 +106,7 @@ def transact_consume_preloaded_messages_and_produce():
         producer.abort_transaction()
     else:
         producer.send_offsets_to_transaction(
-            consumer.position(consumer.assignment()),
-            consumer.consumer_group_metadata()
+            consumer.position(consumer.assignment()), consumer.consumer_group_metadata()
         )
         producer.commit_transaction()
     finally:
