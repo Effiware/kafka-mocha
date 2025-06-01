@@ -117,7 +117,7 @@ class KConsumer:
                     value_field = message.get("value", None)
                     value = value_field["payload"] if value_field else None
                     headers = message.get("headers", None)
-
+                    
                     if _input.get("serialize", False):
                         if isinstance(key, dict):
                             if key_field and key_field.get("subject"):

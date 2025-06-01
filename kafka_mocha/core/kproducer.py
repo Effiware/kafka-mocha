@@ -148,7 +148,6 @@ class KProducer:
         self, positions: list[confluent_kafka.TopicPartition], group_metadata: object, timeout: float = None
     ):
         """Duck type for confluent_kafka/cimpl.py::send_offsets_to_transaction (see signature there).
-
         Sends consumer group offsets to a transaction coordinator as part of a transaction.
         These offsets will be committed atomically with the transaction.
         """
@@ -178,7 +177,6 @@ class KProducer:
             if position.offset >= 0:  # Only commit valid offsets
                 key = f"{group_id}:{position.topic}:{position.partition}".encode()
                 value = str(position.offset).encode()
-
                 # Create an offset commit message (will be part of the transaction)
                 # Mark with producer ID so the simulator knows this is transactional
                 message = KMessage("__consumer_offsets", -1, key, value, timestamp=0, pid=id(self))
