@@ -3,7 +3,7 @@ from typing import Any
 import confluent_kafka
 import pytest
 
-from kafka_mocha.kmodels import CompressionType, KMessage
+from kafka_mocha.models.kmodels import CompressionType, KMessage
 
 
 def test_compression_type() -> None:

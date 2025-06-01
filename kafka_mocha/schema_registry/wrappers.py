@@ -1,8 +1,9 @@
 from functools import partial, wraps
-from typing import Literal, Optional
+from typing import Optional
 from unittest.mock import patch
 
 from kafka_mocha.schema_registry.mock_schema_registry_client import MockSchemaRegistryClient
+from kafka_mocha.models.ktypes import LogLevelType
 
 
 class mock_schema_registry:
@@ -11,11 +12,7 @@ class mock_schema_registry:
     TODO: More detailed description will be added in the future.
     """
 
-    def __init__(
-        self,
-        register_schemas: Optional[list[str]] = None,
-        loglevel: Optional[Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]] = None,
-    ):
+    def __init__(self, register_schemas: Optional[list[dict]] = None, loglevel: Optional[LogLevelType] = None):
         self._patcher = (
             patch(
                 "confluent_kafka.schema_registry.SchemaRegistryClient",

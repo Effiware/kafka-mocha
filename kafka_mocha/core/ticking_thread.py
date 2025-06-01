@@ -3,7 +3,7 @@ from threading import Event, Thread
 from time import sleep
 
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.signals import Tick
+from kafka_mocha.models.signals import Tick
 
 logger = get_custom_logger()
 

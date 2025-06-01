@@ -147,6 +147,7 @@ consumer_config_schema = {
     "enable.auto.commit": {"type": bool, "allowed": [True, False]},
     "auto.commit.interval.ms": {"type": int, "range": (0, 86400000)},
     "enable.auto.offset.store": {"type": bool, "allowed": [True, False]},
+    "auto.offset.reset": {"type": str, "allowed": ["earliest", "latest", "error"]},
     "queued.min.messages": {"type": int, "range": (1, 10000000)},
     "queued.max.messages.kbytes": {"type": int, "range": (1, 2097151)},
     "fetch.wait.max.ms": {"type": int, "range": (0, 300000)},
@@ -163,6 +164,7 @@ consumer_config_schema = {
     "offset_commit_cb": {"type": Callable, "args": 1},
     "enable.partition.eof": {"type": bool, "allowed": [True, False]},
     "check.crcs": {"type": bool, "allowed": [True, False]},
+    "retries": {"type": int, "range": (0, 2147483647)},
 }
 
 
@@ -265,11 +267,32 @@ def validate_producer_config(config) -> None:
 
 
 def validate_consumer_config(config) -> None:
-    """Validates producer's (C/P = C) configuration options for KafkaProducer.
+    """Validates consumer's (C/P = C) configuration options for KafkaConsumer.
 
     :param config: Configuration dictionary
     :raises KafkaClientBootstrapException: If configuration is invalid
     """
+    # Check for required group.id for most use cases
+    if "group.id" not in config:
+        raise KafkaClientBootstrapException("Configuration validation errors: group.id is required for KConsumer")
+
+    # Auto-commit related checks
+    enable_auto_commit = config.get("enable.auto.commit", True)
+    auto_commit_interval_ms = config.get("auto.commit.interval.ms", 5000)
+    enable_auto_offset_store = config.get("enable.auto.offset.store", True)
+
+    # Validate auto_commit_interval_ms when auto commit is enabled
+    if enable_auto_commit:
+        # Check if auto_commit_interval_ms is an int and is positive
+        if not isinstance(auto_commit_interval_ms, int) or auto_commit_interval_ms <= 0:
+            raise KafkaClientBootstrapException(
+                "Configuration validation errors: auto.commit.interval.ms must be a positive integer when enable.auto.commit is True"
+            )
+
+    # Validate combination of auto offset store and auto commit
+    if not enable_auto_offset_store and not enable_auto_commit:
+        # This is allowed but requires explicit calls to store_offsets() and commit()
+        pass
 
     _validate_against_schema(consumer_config_schema, config)
 

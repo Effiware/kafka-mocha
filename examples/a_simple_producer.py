@@ -61,14 +61,14 @@ def as_context_manager():
     """It can be used as a context manager.
 
     >>> as_context_manager()
-    Mock message delivered to test-simple-producer-topic (context manager)
+    Mock message delivered to test-simple-producer-topic-cm (context manager)
     """
     with mock_producer():
         producer = confluent_kafka.Producer({"bootstrap.servers": "localhost:9092"})
 
         # some pre-processing
         producer.produce(
-            TOPIC_NAME,
+            TOPIC_NAME + "-cm",
             datetime.now().isoformat(),
             str(id(producer)),
             on_delivery=lambda err, msg: (
@@ -92,7 +92,7 @@ def as_decorated_inner_function():
     """
 
     # some pre-processing
-    handle_produce(TOPIC_NAME)
+    handle_produce(TOPIC_NAME + "-inner")
     # some post-processing
 
 

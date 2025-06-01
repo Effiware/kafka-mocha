@@ -20,3 +20,19 @@ class KProducerMaxRetryException(Exception):
 
 class KProducerTimeoutException(Exception):
     pass
+
+
+class KConsumerProcessingException(Exception):
+    pass
+
+
+class KConsumerMaxRetryException(Exception):
+    pass
+
+
+class KConsumerTimeoutException(Exception):
+    pass
+
+
+class KConsumerGroupException(Exception):
+    pass

@@ -2,17 +2,18 @@ import signal
 from functools import reduce
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
 import confluent_kafka
 
-from kafka_mocha.buffer_handler import buffer_handler
+from kafka_mocha.core.buffer_handler import buffer_handler
+from kafka_mocha.core.kafka_simulator import KafkaSimulator
+from kafka_mocha.core.ticking_thread import TickingThread
 from kafka_mocha.exceptions import KProducerMaxRetryException, KProducerTimeoutException
-from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.kmodels import KMessage
-from kafka_mocha.signals import KMarkers, KSignals, Tick
-from kafka_mocha.ticking_thread import TickingThread
+from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.models.ktypes import LogLevelType
+from kafka_mocha.models.signals import KMarkers, KSignals, Tick
 from kafka_mocha.utils import validate_config
 
 MAX_BUFFER_LEN = 2147483647
@@ -27,10 +28,7 @@ class KProducer:
     """
 
     def __init__(
-        self,
-        config: dict[str, Any],
-        output: Optional[dict[str, Any]] = None,
-        loglevel: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "WARNING",
+        self, config: dict[str, Any], output: Optional[dict[str, Any]] = None, loglevel: LogLevelType = "WARNING"
     ):
         validate_config("producer", config)
         self.config = config
@@ -149,7 +147,44 @@ class KProducer:
     def send_offsets_to_transaction(
         self, positions: list[confluent_kafka.TopicPartition], group_metadata: object, timeout: float = None
     ):
-        raise NotImplementedError("Not yet implemented...")
+        """Duck type for confluent_kafka/cimpl.py::send_offsets_to_transaction (see signature there).
+        
+        Sends consumer group offsets to a transaction coordinator as part of a transaction.
+        These offsets will be committed atomically with the transaction.
+        """
+        if self._transactional_id is None:
+            raise confluent_kafka.KafkaException(
+                confluent_kafka.KafkaError(
+                    confluent_kafka.KafkaError._NOT_CONFIGURED,
+                    "Transactional API requires transactional.id to be configured",
+                    fatal=True,
+                )
+            )
+            
+        # Extract group_id from metadata
+        if not hasattr(group_metadata, 'group_id'):
+            raise confluent_kafka.KafkaException(
+                confluent_kafka.KafkaError(
+                    confluent_kafka.KafkaError._INVALID_ARG,
+                    "Invalid consumer group metadata",
+                    fatal=False,
+                )
+            )
+            
+        group_id = group_metadata.group_id
+        
+        # Send offset commits as transactional messages
+        for position in positions:
+            if position.offset >= 0:  # Only commit valid offsets
+                key = f"{group_id}:{position.topic}:{position.partition}".encode()
+                value = str(position.offset).encode()
+                
+                # Create an offset commit message (will be part of the transaction)
+                # Mark with producer ID so the simulator knows this is transactional
+                message = KMessage("__consumer_offsets", -1, key, value, timestamp=0, pid=id(self))
+                self._send_with_retry(message)
+                
+        self.logger.debug("Sent offsets to transaction: %s for group: %s", positions, group_id)
 
     def set_sasl_credentials(self, *args, **kwargs):
         raise NotImplementedError("Not yet implemented...")

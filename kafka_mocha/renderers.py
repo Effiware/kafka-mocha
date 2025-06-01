@@ -2,11 +2,12 @@ from datetime import datetime
 from functools import reduce
 from pathlib import Path
 from platform import system
-from typing import Any, Literal
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from kafka_mocha.kmodels import KTopic
+from kafka_mocha.models.kmodels import KTopic
+from kafka_mocha.models.ktypes import OutputFormat
 
 INTERNAL_TOPICS = [
     "__consumer_offsets",
@@ -69,7 +70,7 @@ def render_csv(topics: list[KTopic], **kwargs) -> None:
             output.write(content)
 
 
-def render(output: Literal["html", "csv"], records: list[KTopic], **kwargs) -> None:
+def render(output: OutputFormat, records: list[KTopic], **kwargs) -> None:
     """Strategy pattern for rendering output."""
     include_internal_topics = kwargs.pop("include_internal_topics", False)
     if not include_internal_topics:

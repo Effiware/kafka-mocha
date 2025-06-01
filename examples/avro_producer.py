@@ -7,18 +7,18 @@ from uuid import uuid4
 import confluent_kafka
 import confluent_kafka.schema_registry
 from confluent_kafka.schema_registry.avro import AvroSerializer
-from confluent_kafka.serialization import SerializationContext, MessageField, StringSerializer
+from confluent_kafka.serialization import MessageField, SerializationContext, StringSerializer
 
-from examples.models import UserRegistered, EventEnvelope, SubscriptionType
+from examples.models import EventEnvelope, SubscriptionType, UserRegistered
 from kafka_mocha import mock_producer
 from kafka_mocha.schema_registry import mock_schema_registry
 from kafka_mocha.schema_registry.mock_schema_registry_client import MockSchemaRegistryClient
 
-TOPIC_NAME = "user-registered.avsc"
+TOPIC_NAME = "user-registered-prod-avsc"
 LOCAL_SCHEMA = str(os.path.join(os.path.dirname(__file__), "schemas/user-registered.avsc"))
 
 
-@mock_schema_registry(loglevel="INFO", register_schemas=[LOCAL_SCHEMA])
+@mock_schema_registry(loglevel="INFO", register_schemas=[{"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}])
 @mock_producer(output={"format": "csv"})
 def use_latest_registered_schema():
     """
@@ -79,7 +79,7 @@ def auto_register_schema():
     producer.flush()
 
 
-@mock_schema_registry(register_schemas=[LOCAL_SCHEMA])
+@mock_schema_registry(register_schemas=[{"source": LOCAL_SCHEMA, "subject": TOPIC_NAME + "-value"}])
 @mock_producer()
 def use_any_registered_schema():
     """
@@ -134,7 +134,7 @@ def missing_schema():
     user_id = uuid4()
     event = UserRegistered(user_id, "John", "Doe", True, SubscriptionType.PRO, datetime.now(), 0.0, EventEnvelope())
 
-    avro_serializer(event.to_dict(), SerializationContext(TOPIC_NAME, MessageField.VALUE))
+    avro_serializer(event.to_dict(), SerializationContext("non-existing-topic", MessageField.VALUE))
 
 
 if __name__ == "__main__":

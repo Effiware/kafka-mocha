@@ -4,7 +4,7 @@ from time import sleep
 import pytest
 from confluent_kafka import KafkaError, KafkaException
 
-from kafka_mocha.kproducer import KProducer
+from kafka_mocha.core.kproducer import KProducer
 
 
 def test_kproducer_returns_produced_messages_no__unhappy(kproducer) -> None:
@@ -23,14 +23,15 @@ def test_kproducer_returns_produced_messages_no__happy(kproducer) -> None:
 def test_kafka_simulator_received_messages__short_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a short-running task."""
 
+    topic_name = "test-topic-short"
     no_msg_to_produce = 10000
     for idx, _ in enumerate(range(no_msg_to_produce)):
-        kproducer.produce("topic-1", "value".encode(), f"key-{idx}".encode(), on_delivery=lambda *_: randint(1, 100))
+        kproducer.produce(topic_name, "value".encode(), f"key-{idx}".encode(), on_delivery=lambda *_: randint(1, 100))
 
     kproducer._done()
 
     no_msg_appended = 0
-    for topic in kafka.topics:
+    for topic in filter(lambda t: t.name == topic_name, kafka.topics):
         for partition in topic.partitions:
             no_msg_appended += len(partition._heap)
 
@@ -41,16 +42,16 @@ def test_kafka_simulator_received_messages__short_running_task(kafka, kproducer)
 @pytest.mark.slow
 def test_kafka_simulator_received_messages__medium_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a medium-running task."""
-
+    topic_name = "test-topic-medium"
     no_msg_to_produce = 1000
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.01)
-        kproducer.produce("topic-1", value=f"value-{idx}".encode())
+        kproducer.produce(topic_name, value=f"value-{idx}".encode())
 
     kproducer._done()
 
     no_msg_appended = 0
-    for topic in kafka.topics:
+    for topic in filter(lambda t: t.name == topic_name, kafka.topics):
         for partition in topic.partitions:
             no_msg_appended += len(partition._heap)
 
@@ -61,21 +62,22 @@ def test_kafka_simulator_received_messages__medium_running_task(kafka, kproducer
 @pytest.mark.slow
 def test_kafka_simulator_received_messages__long_running_task(kafka, kproducer):
     """Test that Kafka has written all sent messages for a long-running task."""
+    topic_name = "test-topic-long"
     no_msg_to_produce = 100
     for idx, _ in enumerate(range(no_msg_to_produce)):
         sleep(0.3)
         kproducer.produce(
-            "topic-1",
+            topic_name,
             f"key-{idx}".encode(),
             "value".encode(),
             headers=[(f"hkey-{idx}", b"hvalue")],
-            on_delivery=lambda err, msg: print(f"Error: {err}") if err else print(f"Message delivered: {msg.offset()}")
+            on_delivery=lambda err, msg: print(f"Error: {err}") if err else print(f"Message delivered: {msg.offset()}"),
         )
 
     kproducer._done()
 
     no_msg_appended = 0
-    for topic in kafka.topics:
+    for topic in filter(lambda t: t.name == topic_name, kafka.topics):
         for partition in topic.partitions:
             no_msg_appended += len(partition._heap)
 

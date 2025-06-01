@@ -1,0 +1,68 @@
+[
+  {
+    "key": {
+      "payload": "856254a0-7ec9-47cb-8f61-fd51e92eeb96"
+    },
+    "value": {
+      "payload": {
+        "user_id": "856254a0-7ec9-47cb-8f61-fd51e92eeb96",
+        "user_name": "Albert",
+        "user_last_name": "Testinsky",
+        "is_new_user": true,
+        "subscription_type": "FREE",
+        "registration_timestamp": 1748176215095,
+        "score": 7.0,
+        "envelope": {
+          "envelope_id": "f2d195e1-9d11-4a58-b310-9e1869373367",
+          "event_timestamp": 1748176215095,
+          "app_name": "ExampleApp",
+          "app_version": "1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "key": {
+      "payload": "237a917d-269f-4e20-96f3-0c4c43ac0d9c"
+    },
+    "value": {
+      "payload": {
+        "user_id": "237a917d-269f-4e20-96f3-0c4c43ac0d9c",
+        "user_name": "Johnny",
+        "user_last_name": "Bravo",
+        "is_new_user": false,
+        "subscription_type": "LITE",
+        "registration_timestamp": 1748176377623,
+        "score": 42.5,
+        "envelope": {
+          "envelope_id": "d218b397-f200-445f-861e-0718b7f2df98",
+          "event_timestamp": 1748176377623,
+          "app_name": "ExampleApp",
+          "app_version": "1.0.0"
+        }
+      }
+    }
+  },
+  {
+    "key": {
+      "payload": "d1b2c3d4-e5f6-7a8b-9a0b-c1d2e3f4g5h6"
+    },
+    "value": {
+      "payload": {
+        "user_id": "d1b2c3d4-e5f6-7a8b-9a0b-c1d2e3f4g5h6",
+        "user_name": "Dakota",
+        "user_last_name": "Doe",
+        "is_new_user": false,
+        "subscription_type": "PRO",
+        "registration_timestamp": 1748176401864,
+        "score": 85.0,
+        "envelope": {
+          "envelope_id": "a1b2c3d4-e5f6-7a8b-9a0b-c1d2e3f4g5h6",
+          "event_timestamp": 1748176401864,
+          "app_name": "ExampleApp",
+          "app_version": "1.0.0"
+        }
+      }
+    }
+  }
+]

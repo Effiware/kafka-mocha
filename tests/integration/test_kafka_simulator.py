@@ -16,9 +16,9 @@ def test_kafka_simulator_bootstrap(fresh_kafka) -> None:
 @pytest.hookimpl(tryfirst=True)
 def test_kafka_simulator_is_singleton(fresh_kafka) -> None:
     """Test that Kafka Simulator is actually a singleton."""
-    import kafka_mocha.kafka_simulator
+    import kafka_mocha.core.kafka_simulator
 
-    new_kafka = kafka_mocha.kafka_simulator.KafkaSimulator()
+    new_kafka = kafka_mocha.core.kafka_simulator.KafkaSimulator()
 
     assert new_kafka is fresh_kafka
     assert new_kafka._instance is fresh_kafka._instance

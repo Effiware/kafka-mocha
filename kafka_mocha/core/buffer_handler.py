@@ -6,11 +6,11 @@ from typing import Callable, Literal, Optional
 
 import confluent_kafka
 
+from kafka_mocha.core.kafka_simulator import KafkaSimulator
 from kafka_mocha.exceptions import KProducerProcessingException
-from kafka_mocha.kafka_simulator import KafkaSimulator
 from kafka_mocha.klogger import get_custom_logger
-from kafka_mocha.kmodels import KMessage
-from kafka_mocha.signals import KSignals, Tick
+from kafka_mocha.models.kmodels import KMessage
+from kafka_mocha.models.signals import KSignals, Tick
 
 DEFAULT_BUFFER_SIZE = 1048576  # 1MB
 DEFAULT_BUFFER_TIMEOUT = 5  # 5ms
@@ -148,7 +148,7 @@ def buffer_handler(
                             )
                         )
                 kafka_handler.send(markers_buffer)
-                transact_cache = dict()
+                transact_cache = defaultdict(list)
 
             else:
                 # (Normal) PMessage received
@@ -186,7 +186,9 @@ def buffer_handler(
 class DeliveryCallbackThread(Thread):
     """Thread that executes delivery callback for each message in the buffer."""
 
-    def __init__(self, owner: str, messages: list[KMessage], shared_error: Optional[confluent_kafka.KafkaError]) -> None:
+    def __init__(
+        self, owner: str, messages: list[KMessage], shared_error: Optional[confluent_kafka.KafkaError]
+    ) -> None:
         """Initialize the delivery callback thread.
 
         :param owner: KProducer's id that owns the message buffer.

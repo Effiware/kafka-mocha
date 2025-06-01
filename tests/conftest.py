@@ -2,6 +2,7 @@ import os
 from importlib import reload
 from logging import LogRecord
 
+import confluent_kafka
 from pytest import fixture
 
 
@@ -26,7 +27,7 @@ def foo_log_record() -> LogRecord:
 @fixture(scope="module")
 def kafka():
     """Returns KafkaSimulator singleton instance."""
-    import kafka_mocha.kafka_simulator as km
+    import kafka_mocha.core.kafka_simulator as km
 
     kafka = km.KafkaSimulator
     kafka._instance = None
@@ -36,7 +37,7 @@ def kafka():
 @fixture(scope="function")
 def fresh_kafka():
     """Yields fresh KafkaSimulator singleton instance."""
-    import kafka_mocha.kafka_simulator as km
+    import kafka_mocha.core.kafka_simulator as km
 
     kafka = km.KafkaSimulator
     kafka._instance = None
@@ -49,7 +50,7 @@ def fresh_kafka__reloaded():
 
     Should be used at the end of test executions as reloads cause problems.
     """
-    import kafka_mocha.kafka_simulator as km
+    import kafka_mocha.core.kafka_simulator as km
 
     reload(km)
     kafka = km.KafkaSimulator
@@ -66,7 +67,7 @@ def fresh_kafka_auto_topic_create_off__reloaded():
     old_value = os.environ.get("KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE", "true")
     os.environ["KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE"] = "false"
 
-    import kafka_mocha.kafka_simulator as km
+    import kafka_mocha.core.kafka_simulator as km
 
     reload(km)
     kafka = km.KafkaSimulator
@@ -78,6 +79,34 @@ def fresh_kafka_auto_topic_create_off__reloaded():
 @fixture()
 def kproducer(kafka):
     """Returns KProducer instance."""
-    import kafka_mocha.kproducer as kp
+    import kafka_mocha.core.kproducer as kp
 
     return kp.KProducer({"bootstrap.servers": "localhost:9092"})
+
+
+@fixture()
+def kconsumer(kafka):
+    """Returns KConsumer instance."""
+    import kafka_mocha.core.kconsumer as kc
+
+    return kc.KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
+
+
+@fixture()
+def kconsumer_with_subscription(kafka):
+    """Returns KConsumer instance with a subscription."""
+    import kafka_mocha.core.kconsumer as kc
+
+    consumer = kc.KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
+    consumer.subscribe(["test-topic"])
+    return consumer
+
+
+@fixture()
+def kconsumer_with_assignment(kafka):
+    """Returns KConsumer instance with manual assignment."""
+    import kafka_mocha.core.kconsumer as kc
+
+    consumer = kc.KConsumer({"bootstrap.servers": "localhost:9092", "group.id": "test-group"})
+    consumer.assign([confluent_kafka.TopicPartition("test-topic", 0)])
+    return consumer

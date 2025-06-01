@@ -3,7 +3,7 @@ from time import sleep
 
 from confluent_kafka import TIMESTAMP_CREATE_TIME
 
-from kafka_mocha.kmodels import KMessage, KTopic
+from kafka_mocha.models.kmodels import KMessage, KTopic
 from kafka_mocha.renderers import render_csv, render_html
 
 

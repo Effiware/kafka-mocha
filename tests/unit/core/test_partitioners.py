@@ -1,6 +1,6 @@
 import pytest
 
-from kafka_mocha.buffer_handler import get_partitioner
+from kafka_mocha.core.buffer_handler import get_partitioner
 
 topics = {"topic-1": {"partition_no": 3}, "topic-2": {"partition_no": 2}}
 
