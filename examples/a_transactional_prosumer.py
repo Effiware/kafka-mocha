@@ -35,8 +35,7 @@ def consume_preloaded_messages_and_produce():
             "bootstrap.servers": "localhost:9092",
             "enable.idempotence": True,
             "transactional.id": "test-transact-prosumer-id",
-
-         }
+        }
     )
     consumer.subscribe([INPUT_TOPIC_NAME])
     producer.init_transactions()
@@ -66,8 +65,7 @@ def consume_preloaded_messages_and_produce():
                 )
 
                 producer.send_offsets_to_transaction(
-                    consumer.position(consumer.assignment()),
-                    consumer.consumer_group_metadata()
+                    consumer.position(consumer.assignment()), consumer.consumer_group_metadata()
                 )
                 producer.commit_transaction()
 
@@ -79,8 +77,7 @@ def consume_preloaded_messages_and_produce():
         producer.abort_transaction()
     else:
         producer.send_offsets_to_transaction(
-            consumer.position(consumer.assignment()),
-            consumer.consumer_group_metadata()
+            consumer.position(consumer.assignment()), consumer.consumer_group_metadata()
         )
         producer.commit_transaction()
     finally:

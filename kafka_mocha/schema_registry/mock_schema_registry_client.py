@@ -62,7 +62,8 @@ class _SchemaStore(object):
                     # if rs.schema == schema:  # For some reason, this comparison is not working
                     #     return rs
                     if (
-                        rs.schema.schema_str == schema.schema_str
+                        schema is not None
+                        and rs.schema.schema_str == schema.schema_str
                         and rs.schema.schema_type == schema.schema_type
                         and rs.schema.references == schema.references
                         and rs.schema.metadata == schema.metadata

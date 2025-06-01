@@ -30,10 +30,17 @@ feature for AWS SDK.
 
 The main component of this project is a process called `KafkaSimulator` which simulates the behavior of an actual Kafka
 Cluster, within the bounds of implementation limitations. The current version includes a `KProducer` class that acts as
-a mock for the `Producer` from the `confluent_kafka` package. A `KConsumer` class is still under development.
+a mock for the `Producer` from the `confluent_kafka` package, and a `KConsumer` class that acts as a mock for the
+`Consumer` from the same package. Both classes can be used as decorators to mock the behavior of the respective
+classes in your tests, allowing you to produce and consume messages without the need for a real Kafka Cluster.
+
+Behavior replication is quite advanced, including support for transactions, manual management of offsets, flushes,
+subscriptions, and more. The `KProducer` and `KConsumer` classes can be used in a similar way to the original
+`Producer` and `Consumer` classes, allowing you to write tests that closely resemble your production code.
 
 Additionally, the project includes a `SchemaRegistryMock` class that acts as a mock for the `SchemaRegistryClient` from
-the `confluent_kafka` package.
+the `confluent_kafka` package. It allows you to register and retrieve schemas, as well as serialize and deserialize
+messages using AVRO and JSON serialization. This is particularly useful when working with production code.
 
 ## Table of Contents
 
@@ -43,6 +50,7 @@ the `confluent_kafka` package.
     - [KProducer](#kproducer)
     - [KConsumer](#kconsumer)
     - [Schema Registry Mock](#schema-registry-mock)
+    - [Check out the examples](#check-out-the-examples)
     - [Absolute imports](#absolute-imports)
 - [Contributing](#contributing)
 - [License](#license)
@@ -130,44 +138,82 @@ def handle_produce():
     producer.flush()
 ```
 
-The `KProducer` class replicates the interface and behavior of the `Producer` class from the `confluent_kafka` library.
-For more examples, see the [examples](./examples) directory.
+The `KProducer` class replicates (pretty well IMHO) the interface and behavior of the `Producer` class from the
+`confluent_kafka` library. For more examples, see the [examples](./examples) directory.
+
+For the time being, the `KProducer` is not fully thread-safe, so it is recommended to use it in a single-threaded,
+single-process environment. Issue is being discussed in GitHub Issues.
 
 <details>
 <summary>Parameters for mock_producer</summary>
 
-| No | Parameter name                 | Parameter type | Comment                                                       |
-|----|--------------------------------|----------------|---------------------------------------------------------------|
-| 1  | loglevel                       | Literal        | See available levels in `logging` library                     |
-| 2  | output                         | dict           | Dictionary with output configuration                          |
-| 3  | output.format                  | Literal        | `html`, `csv` or `int` - output format of messages emitted    |
-| 4  | output.name                    | str            | Name of the output file (only for HTML), e.g. kafka-dump.html |
-| 5  | output.include_internal_topics | bool           | Flag to include internal topics in the output                 |
-| 6  | output.include_markers         | bool           | Flag to include transaction markers in the output             |
+| No | Parameter name                 | Parameter type   | Comment                                                       |
+|----|--------------------------------|------------------|---------------------------------------------------------------|
+| 1  | loglevel                       | OptionalLiteral] | See available levels in `logging` library                     |
+| 2  | output                         | Optional[dict]   | Dictionary with output configuration                          |
+| 3  | output.format                  | Literal          | `html`, `csv` or `int` - output format of messages emitted    |
+| 4  | output.name                    | str              | Name of the output file (only for HTML), e.g. kafka-dump.html |
+| 5  | output.include_internal_topics | Optional[bool]   | Flag to include internal topics in the output                 |
+| 6  | output.include_markers         | Optional[bool]   | Flag to include transaction markers in the output             |
 
 </details>
 
 ### KConsumer
 
-The `KConsumer` class is still under development. It will replicate the interface and behavior of the `Consumer` class
-from the `confluent_kafka` library.
+To use the `KConsumer` class in your tests, you need to import it from the `kafka_simulator` package:
+
+```python
+import confluent_kafka
+
+from kafka_mocha import mock_consumer
+
+
+@mock_consumer()
+def consume_preloaded_messages_batched():
+    """Most basic usage of the KConsumer class. For more go to `examples` directory."""
+    consumer = confluent_kafka.Consumer(
+        {
+            "bootstrap.servers": "localhost:9092",
+            "group.id": "test-group-consume",
+            "auto.offset.reset": "earliest",
+        }
+    )
+    consumer.subscribe(["some-topic", "another-topic"])
+    msgs = consumer.consume(10, timeout=0.5)
+    for msg in msgs:
+        if msg.error():
+            raise confluent_kafka.KafkaException(msg.error())
+        else:
+            print(f"Consumed message: {{'key': '{msg.key()}', 'value': '{msg.value(None)}...'}}")
+    consumer.close()
+```
+
+The `KConsumer` class replicates (pretty well IMHO) the interface and behavior of the `KConsumer` class from the
+`confluent_kafka` library. For more examples, see the [examples](./examples) directory.
+
+For the time being, the `KProducer` is not fully thread-safe, so it is recommended to use it in a single-threaded,
+single-process environment. Issue is being discussed in GitHub Issues.
 
 <details>
 <summary>Parameters for mock_consumer</summary>
 
-| No | Parameter name | Parameter type | Comment                                   |
-|----|----------------|----------------|-------------------------------------------|
-| 1  | loglevel       | Literal        | See available levels in `logging` library |
-| 2  |                |                |                                           |
-| 3  |                |                |                                           |
+| No | Parameter name              | Parameter type       | Comment                                                                                        |
+|----|-----------------------------|----------------------|------------------------------------------------------------------------------------------------|
+| 1  | loglevel                    | Optional[Literal]    | See available levels in `logging` library                                                      |
+| 2  | inputs                      | Optional[list[dict]] | List of dictionary with inputs configuration                                                   |
+| 3  | input                       | dict                 | Configuration of an input                                                                      |
+| 4  | input.source                | str                  | Path to a JSON file with input data (see example structure)                                    |
+| 5  | input.topic                 | str                  | Topic name to which the input data should be sent                                              |
+| 6  | input.subject_name_strategy | Optional[Literal]    | Name strategy for subject, one of `["topic", "topic_record", "record"]` - `"topic"` by default |
+| 7  | input.serialize             | Optional[bool]       | A flag used to serialize data, False by default                                                |
 
 </details>
 
 ### Schema Registry Mock
 
-The Schema Registry mock is a part of the `kafla_mocha` package. It is heavily inspired by
-the [confluent-kafka-python/mock_schema_registry_client](https://github.com/confluentinc/confluent-kafka-python/blob/master/src/confluent_kafka/schema_registry/mock_schema_registry_client.py)
-implementation and hence is lincensed under the Apache License, Version 2.0.
+The Schema Registry mock is a part of the `kafka_mocha` package. It is heavily inspired by the
+[confluent-kafka-python/mock_schema_registry_client](https://github.com/confluentinc/confluent-kafka-python/blob/master/src/confluent_kafka/schema_registry/mock_schema_registry_client.py)
+implementation and hence is licensed under the Apache License, Version 2.0.
 
 It provides fully compatible implementation of the `SchemaRegistryClient` class from the `confluent_kafka` library and
 similarly to the `KProducer` class, it can be used as a decorator:
@@ -182,6 +228,7 @@ from kafka_mocha.schema_registry import mock_schema_registry
 
 @mock_schema_registry()
 def quick_start():
+    """Most basic usage of the MockSchemaRegistry class. For more go to `examples` directory."""
     schema_registry = confluent_kafka.schema_registry.SchemaRegistryClient({"url": "http://localhost:8081"})
     avro_serializer = AvroSerializer(schema_registry, conf={"auto.register.schemas": False})
     avro_serializer({"foo": "bar"}, SerializationContext("topic", MessageField.VALUE))
@@ -192,13 +239,23 @@ For more examples, see the [examples](./examples) directory.
 <details>
 <summary>Parameters for mock_schema_registry</summary>
 
-| No | Parameter name   | Parameter type | Comment                                                                         |
-|----|------------------|----------------|---------------------------------------------------------------------------------|
-| 1  | loglevel         | Literal        | See available levels in `logging` library                                       |
-| 2  | register_schemas | list[str]      | List of schemas (as relative paths) to load into Schema Registry Mock on launch |
-| 3  |                  |                |                                                                                 |
+| No | Parameter name   | Parameter type       | Comment                                                                           |
+|----|------------------|----------------------|-----------------------------------------------------------------------------------|
+| 1  | loglevel         | Optional[Literal]    | See available levels in `logging` library                                         |
+| 2  | register_schemas | Optional[list[dict]] | List of schemas to load into Schema Registry Mock on launch                       |
+| 3  | schema.source    | str                  | Path (relative) to a file with schema definition - only .avsc and .json supported |
+| 4  | schema.subject   | Optional[str]        | Subject Name under which register the schema, 'file_name' + '-value' by default   |
 
 </details>
+
+## Check out the examples
+
+It is highly recommended to check out the [examples](./examples) directory, which contains various examples of how to
+use the `KProducer`, `KConsumer`, and `SchemaRegistryMock` classes. The examples cover a wide range of use cases,
+from the most basic ones to more advanced scenarios, including transactions, manual management of offsets, and
+schema registration. The examples are designed to be easy to understand and can be used as a starting point for your
+tests. They also demonstrate how to use the `mock_producer`, `mock_consumer`, and `mock_schema_registry` decorators to
+mock the behavior of the respective classes in your tests.
 
 ## Absolute imports
 
@@ -210,6 +267,7 @@ important when using `mock_producer` and `mock_consumer` decorators, as they are
 Imports that will work:
 
 ```python
+# USE THAT
 import confluent_kafka
 import confluent_kafka.schema_registry
 
@@ -220,6 +278,7 @@ schema_registry = confluent_kafka.schema_registry.SchemaRegistryClient({"url": "
 Imports that will not work:
 
 ```python
+# DON'T USE THAT
 from confluent_kafka import Producer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 
