@@ -1,60 +1,69 @@
 {
-  "schemaType": "AVRO",
-  "schema": {
     "name": "UserRegistered",
     "namespace": "com.example.user.actions",
     "doc": "User registered event schema",
     "type": "record",
     "fields": [
-      {
-        "name": "user_id",
-        "type": "string",
-        "logicalType": "uuid"
-      },
-      {
-        "name": "user_name",
-        "type": "string"
-      },
-      {
-        "name": "user_last_name",
-        "type": "string"
-      },
-      {
-        "name": "is_new_user",
-        "type": "boolean"
-      },
-      {
-        "name": "subscription_type",
-        "type": {
-          "type": "enum",
-          "name": "SubscriptionType",
-          "symbols": [
-            "FREE",
-            "LITE",
-            "PRO"
-          ]
+        {
+            "name": "user_id",
+            "type": "string",
+            "logicalType": "uuid"
+        },
+        {
+            "name": "user_name",
+            "type": "string"
+        },
+        {
+            "name": "user_last_name",
+            "type": "string"
+        },
+        {
+            "name": "is_new_user",
+            "type": "boolean"
+        },
+        {
+            "name": "subscription_type",
+            "type": {
+                "type": "enum",
+                "name": "SubscriptionType",
+                "symbols": ["FREE", "LITE", "PRO"]
+            }
+        },
+        {
+            "name": "registration_timestamp",
+            "type": "long",
+            "logicalType": "timestamp-millis"
+        },
+        {
+            "name": "score",
+            "type": "double"
+        },
+        {
+            "name": "envelope",
+            "type": {
+                "type": "record",
+                "name": "EventEnvelope",
+                "fields": [
+                    {
+                        "name": "envelope_id",
+                        "type": "string",
+                        "logicalType": "uuid"
+                    },
+                    {
+                        "name": "event_timestamp",
+                        "type": "long",
+                        "logicalType": "timestamp-millis"
+                    },
+                    {
+                        "name": "app_name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "app_version",
+                        "type": "string"
+                    }
+                ]
+            }
         }
-      },
-      {
-        "name": "registration_timestamp",
-        "type": "long",
-        "logicalType": "timestamp-millis"
-      },
-      {
-        "name": "score",
-        "type": "double"
-      },
-      {
-        "name": "envelope",
-        "type": "com.example.EventEnvelope"
-      }
     ]
-  },
-  "references": [
-    {
-      "name": "com.example.EventEnvelope",
-      "subject": "com.example.EventEnvelope",
-      "version": 1
-    }
-  ]
 }

@@ -26,7 +26,23 @@
       },
       "subject": "user-registered-cons-avro-2-value",
       "schemaType": "AVRO"
-    }
+    },
+    "headers": [
+      {
+        "key": "source",
+        "value": {
+          "payload": "registration-service",
+          "encoding": "text"
+        }
+      },
+      {
+        "key": "event-type",
+        "value": {
+          "payload": "user-registered",
+          "encoding": "text"
+        }
+      }
+    ]
   },
   {
     "key": {
@@ -55,7 +71,23 @@
       },
       "subject": "user-registered-cons-avro-2-value",
       "schemaType": "AVRO"
-    }
+    },
+    "headers": [
+      {
+        "key": "source",
+        "value": {
+          "payload": "registration-service",
+          "encoding": "text"
+        }
+      },
+      {
+        "key": "event-type",
+        "value": {
+          "payload": "user-registered",
+          "encoding": "text"
+        }
+      }
+    ]
   },
   {
     "key": {
@@ -84,6 +116,22 @@
       },
       "subject": "user-registered-cons-avro-2-value",
       "schemaType": "AVRO"
-    }
+    },
+    "headers": [
+      {
+        "key": "source",
+        "value": {
+          "payload": "registration-service",
+          "encoding": "text"
+        }
+      },
+      {
+        "key": "event-type",
+        "value": {
+          "payload": "user-registered",
+          "encoding": "text"
+        }
+      }
+    ]
   }
 ]

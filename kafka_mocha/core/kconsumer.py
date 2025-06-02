@@ -142,6 +142,7 @@ class KConsumer:
                         key = json.dumps(key) if isinstance(key, dict) else key
                         value = json.dumps(value) if isinstance(value, dict) else value
 
+                    headers = [(el["key"], str(el["value"]["payload"]).encode()) for el in headers] if headers else None
                     self._buffer_handler.send(KMessage(topic, -1, key, value, headers))
 
                 self._tick_buffer()

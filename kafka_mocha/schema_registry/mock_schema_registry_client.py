@@ -193,9 +193,17 @@ class MockSchemaRegistryClient(_BaseRestClient):
                     raise SchemaRegistryError(
                         400, 40002, "Unsupported schema file format, only AVRO (avsc) and JSON are supported."
                     )
+                schema_type = "AVRO" if extension == "avsc" else "JSON"
+
                 with open(source, "r") as f:
                     _schema = json.loads(f.read())
-                    self.register_schema(subject_name, Schema.from_dict(_schema))
+                    if "schema" in _schema:  # means it is a "registered schema" in JSON format
+                        self.register_schema(subject_name, Schema.from_dict(_schema))
+                    else:  # standard schema in AVRO (avsc) or JSON format
+                        __schema = dict()
+                        __schema["schema"] = _schema
+                        __schema["schemaType"] = schema_type
+                        self.register_schema(subject_name, Schema.from_dict(__schema))
         else:
             raise SchemaRegistryError(400, 40001, "Invalid schema file list format.")
 
@@ -216,9 +224,7 @@ class MockSchemaRegistryClient(_BaseRestClient):
         latest_version = 1 if latest_schema is None else latest_schema.version + 1
 
         registered_schema = RegisteredSchema(schema_id=0, schema=schema, subject=subject_name, version=latest_version)
-
         registered_schema = self._store.set(registered_schema)
-
         return registered_schema
 
     def get_schema(self, schema_id: int, subject_name: str = None, fmt: str = None) -> "Schema":

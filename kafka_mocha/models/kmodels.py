@@ -74,6 +74,8 @@ class KMessage:
             raise TypeError("Message's topic must be a string")
         elif " " in topic:
             raise ValueError("Topic name cannot contain spaces")
+        elif not topic:
+            raise ValueError("Topic name cannot be empty")
 
     @staticmethod
     def _check_key_value(obj: Optional[str | bytes]):
