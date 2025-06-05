@@ -196,14 +196,12 @@ class MockSchemaRegistryClient(_BaseRestClient):
                 schema_type = "AVRO" if extension == "avsc" else "JSON"
 
                 with open(source, "r") as f:
-                    _schema = json.loads(f.read())
+                    _schema_str = f.read()
+                    _schema = json.loads(_schema_str)
                     if "schema" in _schema:  # means it is a "registered schema" in JSON format
                         self.register_schema(subject_name, Schema.from_dict(_schema))
                     else:  # standard schema in AVRO (avsc) or JSON format
-                        __schema = dict()
-                        __schema["schema"] = _schema
-                        __schema["schemaType"] = schema_type
-                        self.register_schema(subject_name, Schema.from_dict(__schema))
+                        self.register_schema(subject_name, Schema(_schema_str, schema_type=schema_type))
         else:
             raise SchemaRegistryError(400, 40001, "Invalid schema file list format.")
 
