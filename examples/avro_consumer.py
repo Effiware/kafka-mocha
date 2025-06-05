@@ -12,7 +12,7 @@ from kafka_mocha.schema_registry import mock_schema_registry
 TOPIC_NAME = "user-registered-cons-avro"
 LOCAL_ENVELOPE = str(os.path.join(os.path.dirname(__file__), "schemas/event-envelope.avsc"))
 LOCAL_SCHEMA_KEY = str(os.path.join(os.path.dirname(__file__), "schemas/struct-key.avsc"))
-LOCAL_SCHEMA_VALUE = str(os.path.join(os.path.dirname(__file__), "schemas/user-registered.avsc"))
+LOCAL_SCHEMA_VALUE = str(os.path.join(os.path.dirname(__file__), "schemas/user-registered-with-reference.avsc"))
 LOCAL_INPUT = str(os.path.join(os.path.dirname(__file__), "inputs/users-registrations-in-avro.json"))
 
 
