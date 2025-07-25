@@ -94,7 +94,7 @@ class KMessage:
                     raise TypeError("Message's headers must be a list (or tuple) of tuples")
                 if not isinstance(header[0], str):
                     raise TypeError("Message's headers' keys must be strings")
-                if not isinstance(header[1], bytes):
+                if header[1] and not isinstance(header[1], bytes):
                     raise TypeError("Message's headers' values must be bytes")
 
         elif isinstance(headers, dict):
@@ -233,10 +233,10 @@ class KMessage:
         if self._headers:
             if isinstance(self._headers, dict):
                 for k, v in self._headers.items():
-                    header_acc += len(k) + len(v)
+                    header_acc += len(k) + len(v) if v is not None else len(k)
             else:
                 for header in self._headers:
-                    header_acc += len(header[0]) + len(header[1])
+                    header_acc += len(header[0]) + len(header[1]) if header[1] is not None else len(header[0])
         key_acc = len(self._key) if self._key else 0
         value_acc = len(self._value) if self._value else 0
         return key_acc + value_acc + header_acc

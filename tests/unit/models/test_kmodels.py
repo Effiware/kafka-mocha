@@ -116,7 +116,7 @@ def test_kmessage_setters() -> None:
     message.set_partition(7)
     message.set_key("set-key".encode("utf-8"))
     message.set_value("set-value".encode("utf-8"))
-    message.set_headers([("h-key", "h-value".encode("utf-8"))])
+    message.set_headers([("h-key-1", "h-value-1".encode("utf-8")), ("h-key-2", None)])
     message.set_timestamp(7, confluent_kafka.TIMESTAMP_LOG_APPEND_TIME)
     message.set_offset(100)
     message.set_pid(666)
@@ -125,8 +125,10 @@ def test_kmessage_setters() -> None:
     assert message.partition() == 7
     assert message.key() == "set-key".encode("utf-8")
     assert message.value(None) == "set-value".encode("utf-8")
-    assert message.headers()[0][0] == "h-key"
-    assert message.headers()[0][1] == "h-value".encode("utf-8")
+    assert message.headers()[0][0] == "h-key-1"
+    assert message.headers()[0][1] == "h-value-1".encode("utf-8")
+    assert message.headers()[1][0] == "h-key-2"
+    assert message.headers()[1][1] is None
     assert message.timestamp() == (confluent_kafka.TIMESTAMP_LOG_APPEND_TIME, 7)
     assert message.offset() == 100
     assert message._pid == 666

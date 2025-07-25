@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kafka-mocha"
-version = "2.0.3"
+version = "2.1.0"
 description = "A Kafka mock library that is designed to be used in integration tests for applications using librdkafka."
 license = "MIT"
 authors = ["and-ratajski <and.ratajski@effiware.com>"]
@@ -17,7 +17,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "^3.11"
 Jinja2 = "^3.1.5"
-confluent-kafka = "^2.4.0, !=2.6.2, !=2.8.1"
+confluent-kafka = "^2.4.0, !=2.6.2, !=2.8.1, <=2.10.0"
 referencing = "^0.36.2"
 jsonschema = "^4.24.0"
 
