@@ -147,7 +147,7 @@ class KMessage:
     def key(self) -> Optional[str | bytes]:
         return self._key
 
-    def value(self, payload) -> Optional[str | bytes]:
+    def value(self, payload=None) -> Optional[str | bytes]:
         return self._value
 
     def offset(self) -> Optional[int]:
@@ -205,7 +205,11 @@ class KMessage:
         self.check_partition_offset(offset, allow_none=False)
         self._offset = offset
 
-    def set_timestamp(self, timestamp_ms: int, timestamp_type: int = confluent_kafka.TIMESTAMP_CREATE_TIME) -> None:
+    def set_timestamp(
+        self,
+        timestamp_ms: int,
+        timestamp_type: int = confluent_kafka.TIMESTAMP_CREATE_TIME,
+    ) -> None:
         """Set the field 'Message.timestamp' with new value."""
         self.check_timestamp((timestamp_ms, timestamp_type))
         self._timestamp = (timestamp_ms, timestamp_type)
@@ -395,7 +399,11 @@ class KConsumerGroup:
 
                 # Create assignment
                 self.assignments.append(
-                    KConsumerAssignment(consumer_id=consumer_id, topic=topic_name, partition=partition_idx)
+                    KConsumerAssignment(
+                        consumer_id=consumer_id,
+                        topic=topic_name,
+                        partition=partition_idx,
+                    )
                 )
 
                 # Add to result

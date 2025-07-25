@@ -25,7 +25,6 @@ from kafka_mocha.models.ktypes import LogLevelType
 from kafka_mocha.schema_registry.exceptions import SchemaRegistryError
 from kafka_mocha.schema_registry.schema_registry_client import RegisteredSchema, Schema, _BaseRestClient
 from kafka_mocha.schema_registry.srlogger import get_custom_logger
-from kafka_mocha.models.ktypes import LogLevelType
 
 
 class _SchemaStore(object):

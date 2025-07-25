@@ -28,7 +28,11 @@ def _prepare_records(topics: list[KTopic]) -> list[dict[str, Any]]:
             {
                 "name": topic.name,
                 "messages": sorted(
-                    reduce(lambda x, y: x + y, [partition._heap for partition in topic.partitions], []),
+                    reduce(
+                        lambda x, y: x + y,
+                        [partition._heap for partition in topic.partitions],
+                        [],
+                    ),
                     key=lambda x: x.timestamp()[1],
                 ),
             }
@@ -40,6 +44,7 @@ def render_html(topics: list[KTopic], **kwargs) -> None:
     """Renders HTML output from the records sent to Kafka."""
     template = environment.get_template("messages.html.jinja")
     topic_records = _prepare_records(topics)
+    target = kwargs["target"] if "target" in kwargs else ""
     output_name = kwargs.get("name", "messages.html")
     include_markers = kwargs.get("include_markers", False)
 
@@ -49,7 +54,8 @@ def render_html(topics: list[KTopic], **kwargs) -> None:
         topics=topic_records,
         include_markers=include_markers,
     )
-    with open(output_name, mode="w", encoding="utf-8") as output:
+    target_file_path = f"{target!s}/{output_name!s}" if len(target) > 0 else output_name
+    with open(target_file_path, mode="w", encoding="utf-8") as output:
         output.write(content)
 
 
@@ -57,7 +63,7 @@ def render_csv(topics: list[KTopic], **kwargs) -> None:
     """Renders CSV output from the records sent to Kafka."""
     template = environment.get_template("messages.csv.jinja")
     topic_records = _prepare_records(topics)
-
+    target = kwargs["target"] if "target" in kwargs else ""
     include_markers = kwargs.get("include_markers", False)
 
     for topic in topic_records:
@@ -66,8 +72,43 @@ def render_csv(topics: list[KTopic], **kwargs) -> None:
         content = "\n".join(
             [line.replace("# Topic:", "\n# Topic:") for line in content.split("\n") if line.strip() != ""]
         )
-        with open(output_name, mode="w", encoding="utf-8") as output:
+        target_file_path = f"{target!s}/{output_name!s}" if len(target) > 0 else output_name
+        with open(target_file_path, mode="w", encoding="utf-8") as output:
             output.write(content)
+
+
+def render_json(topics: list[KTopic], **kwargs) -> None:
+    """Renders CSV output from the records sent to Kafka."""
+    template = environment.get_template("messages.json.jinja")
+    topic_records = _prepare_records(topics)
+    target = kwargs["target"] if "target" in kwargs else ""
+
+    include_markers = kwargs.get("include_markers", False)
+
+    for topic in topic_records:
+        output_name = topic["name"] + ".json"
+        content = template.render(messages=topic["messages"], include_markers=include_markers)
+        content = "\n".join(
+            [line.replace("# Topic:", "\n# Topic:") for line in content.split("\n") if line.strip() != ""]
+        )
+        target_file_path = f"{target!s}/{output_name!s}" if len(target) > 0 else output_name
+        with open(target_file_path, mode="w", encoding="utf-8") as output:
+            output.write(content)
+
+
+def render_memory(topics: list[KTopic], **kwargs) -> None:
+    """Renders memory output from the records sent to Kafka."""
+    topic_records = _prepare_records(topics)
+
+    target: dict | None = None
+    if "target" in kwargs:
+        target = kwargs["target"]
+
+    if target is None or not isinstance(target, dict):
+        raise ValueError("target must be a dictionary")
+
+    for topic in topic_records:
+        target[topic["name"]] = topic["messages"]
 
 
 def render(output: OutputFormat, records: list[KTopic], **kwargs) -> None:
@@ -81,5 +122,9 @@ def render(output: OutputFormat, records: list[KTopic], **kwargs) -> None:
             render_html(records, **kwargs)
         case "csv":
             render_csv(records, **kwargs)
+        case "json":
+            render_json(records, **kwargs)
+        case "memory":
+            render_memory(records, **kwargs)
         case _:
             raise ValueError(f"Unsupported output format: {output}")

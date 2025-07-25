@@ -1,3 +1,4 @@
+import platform
 import signal
 from functools import reduce
 from inspect import GEN_SUSPENDED, getgeneratorstate
@@ -28,7 +29,10 @@ class KProducer:
     """
 
     def __init__(
-        self, config: dict[str, Any], output: Optional[dict[str, Any]] = None, loglevel: LogLevelType = "WARNING"
+        self,
+        config: dict[str, Any],
+        output: Optional[dict[str, Any]] = None,
+        loglevel: LogLevelType = "WARNING",
     ):
         validate_config("producer", config)
         self.config = config
@@ -60,7 +64,12 @@ class KProducer:
         self.purge()
         self._kafka_simulator.transaction_coordinator("abort", id(self), self._transactional_id)
 
-        key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.ABORT.value})
+        key = str(
+            {
+                "transactionalId": self._transactional_id,
+                "markerType": KMarkers.ABORT.value,
+            }
+        )
         value = str({"producerId": id(self), "markerType": KMarkers.ABORT.value})
         message = KMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
         self._send_with_retry(message)
@@ -75,7 +84,12 @@ class KProducer:
         self.flush()
         self._kafka_simulator.transaction_coordinator("commit", id(self), self._transactional_id)
 
-        key = str({"transactionalId": self._transactional_id, "markerType": KMarkers.COMMIT.value})
+        key = str(
+            {
+                "transactionalId": self._transactional_id,
+                "markerType": KMarkers.COMMIT.value,
+            }
+        )
         value = str({"producerId": id(self), "markerType": KMarkers.COMMIT.value})
         message = KMessage("buffer", 666, key.encode(), value.encode(), timestamp=0, marker=True)
         self._send_with_retry(message)
@@ -136,7 +150,16 @@ class KProducer:
         """
         self.buffer.clear()
 
-    def produce(self, topic, value=None, key=None, partition=-1, on_delivery=None, timestamp=0, headers=None) -> None:
+    def produce(
+        self,
+        topic,
+        value=None,
+        key=None,
+        partition=-1,
+        on_delivery=None,
+        timestamp=0,
+        headers=None,
+    ) -> None:
         """Duck type for confluent_kafka/cimpl.py::produce (see signature there).
 
         Instead of producing a real message to Kafka, it is sent to Kafka Simulator.
@@ -145,7 +168,10 @@ class KProducer:
         self._send_with_retry(message)
 
     def send_offsets_to_transaction(
-        self, positions: list[confluent_kafka.TopicPartition], group_metadata: object, timeout: float = None
+        self,
+        positions: list[confluent_kafka.TopicPartition],
+        group_metadata: object,
+        timeout: float = None,
     ):
         """Duck type for confluent_kafka/cimpl.py::send_offsets_to_transaction (see signature there).
         Sends consumer group offsets to a transaction coordinator as part of a transaction.
@@ -194,7 +220,11 @@ class KProducer:
         except IndexError:
             return 0
         else:
-            return reduce(lambda x, y: x + len(y), [partition for partition in topic.partitions], 0)
+            return reduce(
+                lambda x, y: x + len(y),
+                [partition for partition in topic.partitions],
+                0,
+            )
 
     def _tick_buffer(self):
         """
@@ -222,13 +252,15 @@ class KProducer:
             - raise TimeoutException if func doesn't end in the time specified
             - wait (block) if func ends earlier than specified time
         """
-        signal.signal(signal.SIGALRM, self._timeout_handler)
-        signal.setitimer(signal.ITIMER_REAL, timeout)
+        if not platform.system() == "Windows":
+            signal.signal(signal.SIGALRM, self._timeout_handler)
+            signal.setitimer(signal.ITIMER_REAL, timeout)
         start_time = time()
         try:
             result = func(*args, **kwargs)
         finally:
-            signal.setitimer(signal.ITIMER_REAL, 0)
+            if not platform.system() == "Windows":
+                signal.setitimer(signal.ITIMER_REAL, 0)
             elapsed_time = time() - start_time
             remaining_time = timeout - elapsed_time
             if remaining_time > 0:
@@ -256,7 +288,10 @@ class KProducer:
         self._ticking_thread.join(1.5)
         if self._ticking_thread.is_alive():
             # TODO 34: Temporarily set to INFO, should be ERROR
-            self.logger.info("KProducer(%d): Ticking thread is still alive (it's a known issue...)", id(self))
+            self.logger.info(
+                "KProducer(%d): Ticking thread is still alive (it's a known issue...)",
+                id(self),
+            )
         self._buffer_handler.close()
 
     def __len__(self) -> int:

@@ -180,4 +180,5 @@ __pypackages__/
 c-algorithms/
 **.csv
 **.html
+**.json
 **/.claude/settings.local.json

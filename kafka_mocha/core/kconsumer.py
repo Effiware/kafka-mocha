@@ -1,4 +1,5 @@
 import json
+import platform
 import signal
 from inspect import GEN_SUSPENDED, getgeneratorstate
 from time import sleep, time
@@ -93,7 +94,9 @@ class KConsumer:
             self._inputs_upload(inputs)
         if self._enable_auto_commit:
             self._ticking_thread = TickingThread(
-                f"KConsumer({id(self)})", self._buffer_handler, self._auto_commit_interval_ms // 2
+                f"KConsumer({id(self)})",
+                self._buffer_handler,
+                self._auto_commit_interval_ms // 2,
             )
             self._ticking_thread.daemon = True  # TODO 34: Workaround for #34 bug/34-tickingthread-never-joins
             self._ticking_thread.start()
@@ -105,50 +108,56 @@ class KConsumer:
         for _input in inputs:
             if _input.get("source") is None or _input.get("topic") is None:
                 raise KafkaClientBootstrapException("Input format must contain 'source' and 'topic' keys")
-
-            with open(_input["source"], "r") as file:
-                messages: list[dict] = json.loads(file.read())
-                for message in messages:
-                    topic = _input["topic"]
-                    sns = _input.get("subject_name_strategy")
-
-                    key_field = message.get("key", None)
-                    key = key_field["payload"] if key_field else None
-                    value_field = message.get("value", None)
-                    value = value_field["payload"] if value_field else None
-                    headers = message.get("headers", None)
-                    
-                    if _input.get("serialize", False):
-                        if isinstance(key, dict):
-                            if key_field and key_field.get("subject"):
-                                key = self._input_serialize(key_field, "KEY", topic, sns)
-                            else:
-                                key = StringSerializer()(json.dumps(key))
-                        elif isinstance(key, int):
-                            key = IntegerSerializer()(str(key))
+            messages = []
+            src = _input["source"]
+            if isinstance(src, str):
+                with open(_input["source"], "r") as file:
+                    messages: list[dict] = json.loads(file.read())
+            elif isinstance(src, list):
+                messages = src
+            else:
+                raise ValueError(f"Unsupported input source type: {type(src)}. It must be a string or a list[dict]")
+            for message in messages:
+                topic = _input["topic"]
+                sns = _input.get("subject_name_strategy")
+                key_field = message.get("key", None)
+                key = key_field["payload"] if key_field else None
+                value_field = message.get("value", None)
+                value = value_field["payload"] if value_field else None
+                headers = message.get("headers", None)
+                if _input.get("serialize", False):
+                    if isinstance(key, dict):
+                        if key_field and key_field.get("subject"):
+                            key = self._input_serialize(key_field, "KEY", topic, sns)
                         else:
-                            key = StringSerializer()(key)
-
-                        if isinstance(value, dict):
-                            if value_field and value_field.get("subject"):
-                                value = self._input_serialize(value_field, "VALUE", topic, sns)
-                            else:
-                                value = StringSerializer()(json.dumps(value))
-                        elif isinstance(value, int):
-                            value = IntegerSerializer()(str(value))
-                        else:
-                            value = StringSerializer()(value)
+                            key = StringSerializer()(json.dumps(key))
+                    elif isinstance(key, int):
+                        key = IntegerSerializer()(str(key))
                     else:
-                        key = json.dumps(key) if isinstance(key, dict) else key
-                        value = json.dumps(value) if isinstance(value, dict) else value
+                        key = StringSerializer()(key)
+                    if isinstance(value, dict):
+                        if value_field and value_field.get("subject"):
+                            value = self._input_serialize(value_field, "VALUE", topic, sns)
+                        else:
+                            value = StringSerializer()(json.dumps(value))
+                    elif isinstance(value, int):
+                        value = IntegerSerializer()(str(value))
+                    else:
+                        value = StringSerializer()(value)
+                else:
+                    key = json.dumps(key) if isinstance(key, dict) else key
+                    value = json.dumps(value) if isinstance(value, dict) else value
+                headers = [(el["key"], str(el["value"]["payload"]).encode()) for el in headers] if headers else None
+                self._buffer_handler.send(KMessage(topic, -1, key, value, headers))
 
-                    headers = [(el["key"], str(el["value"]["payload"]).encode()) for el in headers] if headers else None
-                    self._buffer_handler.send(KMessage(topic, -1, key, value, headers))
-
-                self._tick_buffer()
+            self._tick_buffer()
 
     def _input_serialize(
-        self, field: dict[str, str], ftype: Literal["KEY", "VALUE"], topic: str, subject_name_strategy: Optional[str]
+        self,
+        field: dict[str, str],
+        ftype: Literal["KEY", "VALUE"],
+        topic: str,
+        subject_name_strategy: Optional[str],
     ) -> bytes:
         """Serialize input data based on the input format. Get schema from the mock schema registry."""
         if self._schema_registry is None:
@@ -171,14 +180,22 @@ class KConsumer:
             json_serializer = JSONSerializer(
                 schema_registry_client=self._schema_registry,
                 schema_str=reg_schema.schema,
-                conf={"auto.register.schemas": False, "use.latest.version": True, "subject.name.strategy": _sns},
+                conf={
+                    "auto.register.schemas": False,
+                    "use.latest.version": True,
+                    "subject.name.strategy": _sns,
+                },
             )
             return json_serializer(field["payload"], SerializationContext(topic, MessageField[ftype]))
         elif field["schemaType"] == "AVRO":
             avro_serializer = AvroSerializer(
                 self._schema_registry,
                 reg_schema.schema,
-                conf={"auto.register.schemas": False, "use.latest.version": True, "subject.name.strategy": _sns},
+                conf={
+                    "auto.register.schemas": False,
+                    "use.latest.version": True,
+                    "subject.name.strategy": _sns,
+                },
             )
             return avro_serializer(field["payload"], SerializationContext(topic, MessageField[ftype]))
         else:
@@ -405,7 +422,11 @@ class KConsumer:
                     return messages
                 else:
                     # It's likely a signal, return empty list
-                    self.logger.debug("KConsumer(%d): received signal %s, returning empty list", id(self), result)
+                    self.logger.debug(
+                        "KConsumer(%d): received signal %s, returning empty list",
+                        id(self),
+                        result,
+                    )
                     return []
             else:
                 self.logger.info("KConsumer(%d): consumer handler is busy", id(self))
@@ -753,13 +774,15 @@ class KConsumer:
         """
         Run function with timeout and block if finished earlier.
         """
-        signal.signal(signal.SIGALRM, self._timeout_handler)
-        signal.setitimer(signal.ITIMER_REAL, timeout)
+        if not platform.system() == "Windows":
+            signal.signal(signal.SIGALRM, self._timeout_handler)
+            signal.setitimer(signal.ITIMER_REAL, timeout)
         start_time = time()
         try:
             result = func(*args, **(kwargs or {}))
         finally:
-            signal.setitimer(signal.ITIMER_REAL, 0)
+            if not platform.system() == "Windows":
+                signal.setitimer(signal.ITIMER_REAL, 0)
             elapsed_time = time() - start_time
             remaining_time = timeout - elapsed_time
             if remaining_time > 0:
@@ -824,10 +847,17 @@ class KConsumer:
         if getgeneratorstate(self._kafka_simulator.consumers_handler) == GEN_SUSPENDED:
             self._kafka_simulator.consumers_handler.send(partition)
 
-        self.logger.debug("Seek to offset %d for %s[%d]", partition.offset, partition.topic, partition.partition)
+        self.logger.debug(
+            "Seek to offset %d for %s[%d]",
+            partition.offset,
+            partition.topic,
+            partition.partition,
+        )
 
     def store_offsets(
-        self, message: Optional[KMessage] = None, offsets: Optional[list[confluent_kafka.TopicPartition]] = None
+        self,
+        message: Optional[KMessage] = None,
+        offsets: Optional[list[confluent_kafka.TopicPartition]] = None,
     ) -> None:
         """
         Store offsets for a message or a list of offsets.

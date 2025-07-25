@@ -1,0 +1,12 @@
+{% macro to_string(value) -%}
+    {% if value is string %}
+        {{value}}
+    {% else %}
+        {{value.decode()}}
+    {% endif  %}
+{%- endmacro %}
+[
+{"timestamp": {{ messages[0].timestamp()[1] }}, "partition": {{ messages[0].partition() }}, "offset": {{ messages[0].offset() }}, "key": "{{ messages[0].key() }}","headers": {% if messages[0].headers() %}[{"key": "{{messages[0].headers()[0][0]}}", "value": "{{to_string(messages[0].headers()[0][1])}}"}{% for h in messages[0].headers()[1:]%} ,{"key": "{{h[0]}}", "value": "{{to_string(h[1])}}"}{% endfor %}] {% else %}null{% endif %},"value": {{to_string(messages[0].value(None))}}}
+{% for message in messages[1:] if include_markers or not message._marker %}
+,{"timestamp": {{ message.timestamp()[1] }}, "partition": {{ message.partition() }}, "offset": {{ message.offset() }}, "key": "{{ message.key() }}","headers": {% if message.headers() %}[{"key": "{{message.headers()[0][0]}}", "value": "{{to_string(message.headers()[0][1])}}"}{% for h in message.headers()[1:]%} ,{"key": "{{h[0]}}", "value": "{{to_string(h[1])}}"}{% endfor %}] {% else %}null{% endif %},"value": {{to_string(message.value(None))}}}
+{% endfor %}]

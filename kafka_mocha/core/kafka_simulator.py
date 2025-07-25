@@ -264,7 +264,7 @@ class KafkaSimulator:
                 if not dry_run:
                     # Abort pending transactional offset commits
                     self._abort_pending_transactional_offsets(producer_id, transactional_id)
-                    
+
                     # Reset state
                     for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
@@ -518,7 +518,7 @@ class KafkaSimulator:
                 consumer_group = self._consumer_groups[group_id]
                 if topic not in consumer_group.offsets:
                     consumer_group.offsets[topic] = {}
-                
+
                 consumer_group.offsets[topic][partition] = offset
                 logger.debug(
                     "Updated offset for group %s, topic %s, partition %d to %d", group_id, topic, partition, offset
