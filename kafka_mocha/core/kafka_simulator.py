@@ -6,17 +6,9 @@ from threading import Lock
 from typing import Any, Literal, NamedTuple, Optional
 
 import confluent_kafka
-from confluent_kafka.admin import (
-    BrokerMetadata,
-    ClusterMetadata,
-    PartitionMetadata,
-    TopicMetadata,
-)
+from confluent_kafka.admin import BrokerMetadata, ClusterMetadata, PartitionMetadata, TopicMetadata
 
-from kafka_mocha.exceptions import (
-    KafkaSimulatorBootstrapException,
-    KafkaSimulatorProcessingException,
-)
+from kafka_mocha.exceptions import KafkaSimulatorBootstrapException, KafkaSimulatorProcessingException
 from kafka_mocha.klogger import get_custom_logger
 from kafka_mocha.models.kmodels import KConsumerGroup, KMessage, KTopic
 from kafka_mocha.models.signals import KSignals
@@ -28,15 +20,10 @@ try:
     MESSAGE_TIMESTAMP_TYPE = os.environ.get(
         "KAFKA_MOCHA_KSIM_MESSAGE_TIMESTAMP_TYPE", confluent_kafka.TIMESTAMP_CREATE_TIME
     )
-    AUTO_CREATE_TOPICS_ENABLE = (
-        os.environ.get("KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE", "true").lower()
-        == "true"
-    )
+    AUTO_CREATE_TOPICS_ENABLE = os.environ.get("KAFKA_MOCHA_KSIM_AUTO_CREATE_TOPICS_ENABLE", "true").lower() == "true"
     TOPICS = json.loads(os.environ.get("KAFKA_MOCHA_KSIM_TOPICS", "[]"))
 except KeyError as err:
-    raise KafkaSimulatorBootstrapException(
-        f"Missing Kafka Mocha required variable: {err}"
-    ) from None
+    raise KafkaSimulatorBootstrapException(f"Missing Kafka Mocha required variable: {err}") from None
 
 SYSTEM_TOPICS = ["_schemas", "__consumer_offsets"]
 logger = get_custom_logger()
@@ -82,18 +69,14 @@ class KafkaSimulator:
         self.topics: list[KTopic] = [KTopic.from_env(topic) for topic in TOPICS]
         for sys_topic in SYSTEM_TOPICS:
             self.topics.append(KTopic(sys_topic))
-        self._registered_transact_ids: dict[str, list[ProducerAndState]] = defaultdict(
-            list
-        )  # Epoch is list length
+        self._registered_transact_ids: dict[str, list[ProducerAndState]] = defaultdict(list)  # Epoch is list length
 
         # Consumer group management
         self._consumer_groups: dict[str, KConsumerGroup] = {}
         self._consumer_2_group: dict[int, str] = {}  # consumer_id -> group_id mapping
 
         # Transactional offset commits - keyed by (producer_id, transactional_id)
-        self._pending_transactional_offsets: dict[tuple[int, str], list[KMessage]] = (
-            defaultdict(list)
-        )
+        self._pending_transactional_offsets: dict[tuple[int, str], list[KMessage]] = defaultdict(list)
 
         # Start handlers
         self.producers_handler = self.handle_producers()
@@ -110,9 +93,7 @@ class KafkaSimulator:
         self._is_running = False
         self.__init__()
 
-    def _topics_2_cluster_metadata(
-        self, topics: Optional[list[KTopic]] = None
-    ) -> ClusterMetadata:
+    def _topics_2_cluster_metadata(self, topics: Optional[list[KTopic]] = None) -> ClusterMetadata:
         """Converts KTopics into ClusterMetadata (stubbed)."""
 
         def _t_metadata_factory(_topic: KTopic) -> TopicMetadata:
@@ -162,9 +143,7 @@ class KafkaSimulator:
         else:
             return self._topics_2_cluster_metadata([])
 
-    def register_producer_transaction_id(
-        self, producer_id: int, transactional_id: str
-    ) -> None:
+    def register_producer_transaction_id(self, producer_id: int, transactional_id: str) -> None:
         """Registers transactional id for producer. Also, prepares transaction coordinator and needed infrastructure."""
         topics = list(filter(lambda x: x.name == self.TRANSACT_TOPIC, self.topics))
         if not topics:
@@ -175,9 +154,7 @@ class KafkaSimulator:
                 config={"cleanup.policy": "compact"},
             )
             self.topics.append(topic)
-        self._registered_transact_ids[transactional_id].append(
-            ProducerAndState(producer_id)
-        )
+        self._registered_transact_ids[transactional_id].append(ProducerAndState(producer_id))
 
     def transaction_coordinator(
         self,
@@ -216,9 +193,7 @@ class KafkaSimulator:
         match state:
             case "init":
                 self.register_producer_transaction_id(producer_id, transactional_id)
-                msg_value["producerEpoch"] = (
-                    len(self._registered_transact_ids[transactional_id]) - 1
-                )
+                msg_value["producerEpoch"] = len(self._registered_transact_ids[transactional_id]) - 1
                 msg_value["state"] = "Empty"
                 msgs = [
                     KMessage(
@@ -230,9 +205,7 @@ class KafkaSimulator:
                 ]
 
             case "begin":
-                if producer_id not in map(
-                    lambda x: x[0], self._registered_transact_ids[transactional_id]
-                ):
+                if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
                     raise confluent_kafka.KafkaException(
                         confluent_kafka.KafkaError(
                             confluent_kafka.KafkaError._STATE,
@@ -267,18 +240,12 @@ class KafkaSimulator:
                 ]
                 if not dry_run:
                     # set it state to ongoing
-                    for idx, _id in enumerate(
-                        self._registered_transact_ids[transactional_id]
-                    ):
+                    for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
-                            self._registered_transact_ids[transactional_id][idx] = (
-                                ProducerAndState(producer_id, True)
-                            )
+                            self._registered_transact_ids[transactional_id][idx] = ProducerAndState(producer_id, True)
 
             case "commit":
-                if producer_id not in map(
-                    lambda x: x[0], self._registered_transact_ids[transactional_id]
-                ):
+                if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
                     raise confluent_kafka.KafkaException(
                         confluent_kafka.KafkaError(
                             confluent_kafka.KafkaError._STATE,
@@ -327,23 +294,15 @@ class KafkaSimulator:
                 )
                 if not dry_run:
                     # Commit pending transactional offset commits
-                    self._commit_pending_transactional_offsets(
-                        producer_id, transactional_id
-                    )
+                    self._commit_pending_transactional_offsets(producer_id, transactional_id)
 
                     # Reset state
-                    for idx, _id in enumerate(
-                        self._registered_transact_ids[transactional_id]
-                    ):
+                    for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
-                            self._registered_transact_ids[transactional_id][idx] = (
-                                ProducerAndState(producer_id, False)
-                            )
+                            self._registered_transact_ids[transactional_id][idx] = ProducerAndState(producer_id, False)
 
             case "abort":
-                if producer_id not in map(
-                    lambda x: x[0], self._registered_transact_ids[transactional_id]
-                ):
+                if producer_id not in map(lambda x: x[0], self._registered_transact_ids[transactional_id]):
                     raise confluent_kafka.KafkaException(
                         confluent_kafka.KafkaError(
                             confluent_kafka.KafkaError._STATE,
@@ -365,13 +324,9 @@ class KafkaSimulator:
                     self._abort_pending_transactional_offsets(producer_id, transactional_id)
 
                     # Reset state
-                    for idx, _id in enumerate(
-                        self._registered_transact_ids[transactional_id]
-                    ):
+                    for idx, _id in enumerate(self._registered_transact_ids[transactional_id]):
                         if _id[0] == producer_id:
-                            self._registered_transact_ids[transactional_id][idx] = (
-                                ProducerAndState(producer_id, False)
-                            )
+                            self._registered_transact_ids[transactional_id][idx] = ProducerAndState(producer_id, False)
 
             case _:
                 raise ValueError(f"Invalid transaction {state=}")
@@ -388,15 +343,9 @@ class KafkaSimulator:
         last_received_msg_ts = -1
         while True:
             received_msgs: list[KMessage] = yield KSignals.SUCCESS  # buffered
-            last_received_msg_ts = (
-                received_msgs[-1].timestamp()[1]
-                if received_msgs
-                else last_received_msg_ts
-            )
+            last_received_msg_ts = received_msgs[-1].timestamp()[1] if received_msgs else last_received_msg_ts
             for msg in received_msgs:
-                _msg_destination_topic = [
-                    topic for topic in self.topics if topic.name == msg.topic()
-                ]
+                _msg_destination_topic = [topic for topic in self.topics if topic.name == msg.topic()]
                 if not _msg_destination_topic and not AUTO_CREATE_TOPICS_ENABLE:
                     raise KafkaSimulatorProcessingException(
                         f"Topic {msg.topic()} does not exist and "
@@ -412,14 +361,10 @@ class KafkaSimulator:
                 try:
                     partition = _topic.partitions[msg.partition()]
                 except IndexError:
-                    raise KafkaSimulatorProcessingException(
-                        f"Invalid partition assignment: {msg.partition()}"
-                    )
+                    raise KafkaSimulatorProcessingException(f"Invalid partition assignment: {msg.partition()}")
                 else:
                     if msg._pid:
-                        _msg_pid_already_appended = msg._pid in [
-                            krecord._pid for krecord in partition._heap
-                        ]
+                        _msg_pid_already_appended = msg._pid in [krecord._pid for krecord in partition._heap]
                         if _msg_pid_already_appended:
                             continue
                     msg.set_offset(1000 + len(partition))
@@ -459,9 +404,7 @@ class KafkaSimulator:
                     partition = topic.partitions[tp.partition]
                     messages += partition.get_by_offset(tp.offset, max_records)
 
-                logger.debug(
-                    "Consumer %d polling, found %d messages", consumer_id, len(messages)
-                )
+                logger.debug("Consumer %d polling, found %d messages", consumer_id, len(messages))
                 result = messages
 
             elif isinstance(request, confluent_kafka.TopicPartition):
@@ -487,13 +430,9 @@ class KafkaSimulator:
                 result = KSignals.SUCCESS
 
             else:
-                raise KafkaSimulatorProcessingException(
-                    f"Unknown request type in consumer handler: {type(request)}"
-                )
+                raise KafkaSimulatorProcessingException(f"Unknown request type in consumer handler: {type(request)}")
 
-    def register_consumer(
-        self, consumer_id: int, group_id: str, topics: list[str]
-    ) -> None:
+    def register_consumer(self, consumer_id: int, group_id: str, topics: list[str]) -> None:
         """
         Register a consumer with a consumer group.
 
@@ -521,9 +460,7 @@ class KafkaSimulator:
         """Unregister a consumer from its consumer group."""
         if consumer_id in self._consumer_2_group:
             group_id = self._consumer_2_group[consumer_id]
-            logger.debug(
-                "Unregistering consumer %d from group %s", consumer_id, group_id
-            )
+            logger.debug("Unregistering consumer %d from group %s", consumer_id, group_id)
 
             # Remove the consumer from the group
             if group_id in self._consumer_groups:
@@ -533,9 +470,7 @@ class KafkaSimulator:
                 if self._consumer_groups[group_id].members:
                     self._rebalance_and_notify(group_id)
             else:
-                logger.warning(
-                    "Consumer group %s not found for consumer %d", group_id, consumer_id
-                )
+                logger.warning("Consumer group %s not found for consumer %d", group_id, consumer_id)
 
             # Remove the mapping
             del self._consumer_2_group[consumer_id]
@@ -560,9 +495,7 @@ class KafkaSimulator:
         # Get the old assignments for each consumer
         old_assignments = {}
         for consumer_id in consumer_group.members:
-            old_assignments[consumer_id] = consumer_group.get_member_assignment(
-                consumer_id
-            )
+            old_assignments[consumer_id] = consumer_group.get_member_assignment(consumer_id)
 
         # Compute new assignments
         new_assignments = consumer_group.rebalance(self.topics)
@@ -576,20 +509,14 @@ class KafkaSimulator:
             revoked_tps = [
                 tp
                 for tp in old_tps
-                if not any(
-                    ntp.topic == tp.topic and ntp.partition == tp.partition
-                    for ntp in new_tps
-                )
+                if not any(ntp.topic == tp.topic and ntp.partition == tp.partition for ntp in new_tps)
             ]
 
             # Identify assigned partitions
             assigned_tps = [
                 tp
                 for tp in new_tps
-                if not any(
-                    otp.topic == tp.topic and otp.partition == tp.partition
-                    for otp in old_tps
-                )
+                if not any(otp.topic == tp.topic and otp.partition == tp.partition for otp in old_tps)
             ]
 
             logger.debug(
@@ -601,14 +528,10 @@ class KafkaSimulator:
             # The actual notification of consumers is done through the KConsumer.subscribe method
             # which will query for its assignment
 
-    def assign_partitions(
-        self, consumer_id: int, partitions: list[confluent_kafka.TopicPartition]
-    ) -> None:
+    def assign_partitions(self, consumer_id: int, partitions: list[confluent_kafka.TopicPartition]) -> None:
         """Manually assign partitions to a consumer (outside of consumer groups)."""
         # For manual partition assignment, we don't involve consumer groups
-        logger.debug(
-            "Manually assigning partitions to consumer %d: %s", consumer_id, partitions
-        )
+        logger.debug("Manually assigning partitions to consumer %d: %s", consumer_id, partitions)
 
     def get_committed_offsets(
         self, consumer_id: int, partitions: list[confluent_kafka.TopicPartition]
@@ -626,18 +549,12 @@ class KafkaSimulator:
 
             if group_id in self._consumer_groups:
                 for tp in partitions:
-                    offset = self._consumer_groups[group_id].get_offset(
-                        tp.topic, tp.partition
-                    )
-                    result.append(
-                        confluent_kafka.TopicPartition(tp.topic, tp.partition, offset)
-                    )
+                    offset = self._consumer_groups[group_id].get_offset(tp.topic, tp.partition)
+                    result.append(confluent_kafka.TopicPartition(tp.topic, tp.partition, offset))
 
         return result
 
-    def _rebalance_group(
-        self, group_id: str
-    ) -> dict[int, list[confluent_kafka.TopicPartition]]:
+    def _rebalance_group(self, group_id: str) -> dict[int, list[confluent_kafka.TopicPartition]]:
         """Rebalance a consumer group and return the new assignments."""
         if group_id not in self._consumer_groups:
             return {}
@@ -645,16 +562,12 @@ class KafkaSimulator:
         logger.debug("Rebalancing consumer group %s", group_id)
         return self._consumer_groups[group_id].rebalance(self.topics)
 
-    def get_member_assignment(
-        self, consumer_id: int
-    ) -> list[confluent_kafka.TopicPartition]:
+    def get_member_assignment(self, consumer_id: int) -> list[confluent_kafka.TopicPartition]:
         """Get the current assignment for a consumer."""
         if consumer_id in self._consumer_2_group:
             group_id = self._consumer_2_group[consumer_id]
             if group_id in self._consumer_groups:
-                return self._consumer_groups[group_id].get_member_assignment(
-                    consumer_id
-                )
+                return self._consumer_groups[group_id].get_member_assignment(consumer_id)
         return []
 
     def render_records(self, output: dict[str, Any]):
@@ -669,16 +582,8 @@ class KafkaSimulator:
         """Process offset commit message and update consumer group state."""
         try:
             # Parse the offset commit message
-            key = (
-                message.key().decode()
-                if isinstance(message.key(), bytes)
-                else message.key()
-            )
-            value = (
-                message.value(None).decode()
-                if isinstance(message.value(None), bytes)
-                else message.value(None)
-            )
+            key = message.key().decode() if isinstance(message.key(), bytes) else message.key()
+            value = message.value(None).decode() if isinstance(message.value(None), bytes) else message.value(None)
 
             # Expected format: "group_id:topic:partition"
             group_id, topic, partition_str = key.split(":", 2)
@@ -733,9 +638,7 @@ class KafkaSimulator:
                 transactional_id,
             )
 
-    def _commit_pending_transactional_offsets(
-        self, producer_id: int, transactional_id: str
-    ) -> None:
+    def _commit_pending_transactional_offsets(self, producer_id: int, transactional_id: str) -> None:
         """Commit all pending transactional offset commits for a producer."""
         key = (producer_id, transactional_id)
         pending_offsets = self._pending_transactional_offsets.get(key, [])
@@ -755,9 +658,7 @@ class KafkaSimulator:
         if key in self._pending_transactional_offsets:
             del self._pending_transactional_offsets[key]
 
-    def _abort_pending_transactional_offsets(
-        self, producer_id: int, transactional_id: str
-    ) -> None:
+    def _abort_pending_transactional_offsets(self, producer_id: int, transactional_id: str) -> None:
         """Abort (discard) all pending transactional offset commits for a producer."""
         key = (producer_id, transactional_id)
         pending_count = len(self._pending_transactional_offsets.get(key, []))
