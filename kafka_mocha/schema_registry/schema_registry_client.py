@@ -224,7 +224,6 @@ class Rule:
 
     def to_dict(self) -> Dict[str, Any]:
         name = self.name
-
         doc = self.doc
 
         kind_str: Optional[str] = None
@@ -236,7 +235,6 @@ class Rule:
             mode_str = self.mode.value
 
         rule_type = self.type
-
         tags = self.tags
 
         _params: Optional[Dict[str, Any]] = None
@@ -244,11 +242,8 @@ class Rule:
             _params = self.params.to_dict()
 
         expr = self.expr
-
         on_success = self.on_success
-
         on_failure = self.on_failure
-
         disabled = self.disabled
 
         field_dict: Dict[str, Any] = {}
@@ -305,11 +300,8 @@ class Rule:
             params = RuleParams.from_dict(_params)
 
         expr = d.pop("expr", None)
-
         on_success = d.pop("onSuccess", None)
-
         on_failure = d.pop("onFailure", None)
-
         disabled = d.pop("disabled", None)
 
         rule = cls(
@@ -636,15 +628,14 @@ class RegisteredSchema:
     schema: Optional[Schema]
     subject: Optional[str]
     version: Optional[int]
+    guid: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         schema = self.schema
-
         schema_id = self.schema_id
-
         subject = self.subject
-
         version = self.version
+        guid = self.guid
 
         field_dict: Dict[str, Any] = {}
         if schema is not None:
@@ -655,6 +646,8 @@ class RegisteredSchema:
             field_dict["subject"] = subject
         if version is not None:
             field_dict["version"] = version
+        if guid is not None:
+            field_dict["guid"] = guid
 
         return field_dict
 
@@ -663,18 +656,17 @@ class RegisteredSchema:
         d = src_dict.copy()
 
         schema = Schema.from_dict(d)
-
         schema_id = d.pop("id", None)
-
         subject = d.pop("subject", None)
-
         version = d.pop("version", None)
+        guid = d.pop("guid", None)
 
         schema = cls(
             schema_id=schema_id,
             schema=schema,
             subject=subject,
             version=version,
+            guid=guid,
         )
 
         return schema
